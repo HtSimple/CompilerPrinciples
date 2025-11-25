@@ -1,0 +1,54 @@
+# ------------------------------------------
+# yacc_rules.bnf
+# ------------------------------------------
+# 定义语法规则 + 语义动作标签（不含代码）
+# ------------------------------------------
+
+<program> ::= <function_list>
+<function_list> ::= <function> <function_list> | ε
+
+<function> ::= <type> IDENTIFIER LPAREN <param_list> RPAREN LBRACE <stmt_list> RBRACE
+
+<param_list> ::= <param> COMMA <param_list> | <param> | ε
+<param> ::= <type> IDENTIFIER
+
+<type> ::= INT | VOID
+
+<stmt_list> ::= <stmt> <stmt_list> | ε
+
+<stmt> ::= <var_decl>                  #var_decl_code
+        | <assign_stmt>                #assign_code
+        | <if_stmt>                    #if_code
+        | <while_stmt>                 #while_code
+        | <return_stmt>                #return_code
+        | <expr_stmt>                  #expr_code
+        | <block_stmt>                 #block_code
+
+<var_decl> ::= <type> IDENTIFIER SEMI
+
+<assign_stmt> ::= IDENTIFIER ASSIGN <expr> SEMI
+
+<if_stmt> ::= IF LPAREN <expr> RPAREN <stmt> ELSE <stmt>
+            | IF LPAREN <expr> RPAREN <stmt>
+
+<while_stmt> ::= WHILE LPAREN <expr> RPAREN <stmt>
+
+<return_stmt> ::= RETURN <expr> SEMI
+                | RETURN SEMI
+
+<expr_stmt> ::= <expr> SEMI
+
+<block_stmt> ::= LBRACE <stmt_list> RBRACE
+
+<expr> ::= <expr> PLUS <term>    #add
+         | <expr> MINUS <term>   #sub
+         | <term>
+
+<term> ::= <term> MULT <factor>  #mul
+         | <term> DIV <factor>   #div
+         | <factor>
+
+<factor> ::= NUMBER
+           | STRING
+           | IDENTIFIER
+           | LPAREN <expr> RPAREN
