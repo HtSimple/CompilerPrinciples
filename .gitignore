@@ -1,0 +1,25 @@
+# 忽略Python虚拟环境目录
+.compiler_venv/
+
+# 可选：补充Python通用忽略规则（推荐）
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg

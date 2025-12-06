@@ -1,63 +1,93 @@
-# src/runtime/ctx.py
-# --------------------------------------------
-# 中间代码生成上下文（Context）
-# 提供临时变量生成、标签管理、TAC 生成和输出
-# --------------------------------------------
+# ctx.py
+"""
+TACContext: 中间代码生成上下文
+用于存放临时变量、生成三地址码（TAC）
+"""
 
-from typing import List, Optional
+import os
 
-class Context:
-    """
-    语义上下文，用于语法分析时生成三地址码（TAC）。
-    """
+class TACContext:
     def __init__(self):
-        self.temp_count = 0        # 临时变量计数
-        self.label_count = 0       # 标签计数
-        self.code: List[str] = []  # 三地址码列表
+        # 存放中间代码，每条代码格式为 (op, arg1, arg2, result)
+        # 保持 tuple 形式，方便后续格式化
+        self.code = []
 
-    # ---------------- 临时变量管理 ----------------
-    def new_temp(self) -> str:
-        """
-        生成新的临时变量名
-        t0, t1, t2 ...
-        """
-        name = f"t{self.temp_count}"
+        # 临时变量计数
+        self.temp_count = 0
+
+        # 标签计数（用于 if/while 等控制流）
+        self.label_count = 0
+
+    # 生成新的临时变量
+    def new_temp(self):
+        t = f"t{self.temp_count}"
         self.temp_count += 1
-        return name
+        return t
 
-    # ---------------- 标签管理 ----------------
-    def new_label(self) -> str:
-        """
-        生成新的标签
-        L0, L1, ...
-        """
-        label = f"L{self.label_count}"
+    # 生成新的标签
+    def new_label(self):
+        l = f"L{self.label_count}"
         self.label_count += 1
-        return label
+        return l
 
-    # ---------------- 代码生成 ----------------
-    def emit(self, code_line: str):
+    # 添加一条三地址码
+    def emit(self, op, arg1=None, arg2=None, result=None):
         """
-        添加一行三地址码
+        op: 操作符或指令名
+        arg1, arg2: 操作数
+        result: 结果
+        存入统一的四元组，方便后续统一输出。
         """
-        self.code.append(code_line)
+        self.code.append((op, arg1, arg2, result))
 
-    def emit_label(self, label: str):
+    # 返回内部的 instructions（以字符串形式便于直接写文件或打印）
+    def get_instructions(self):
         """
-        添加标签
+        返回格式化后的指令列表（每项为字符串）。
+        格式化规则尽量通用：
+        - 如果 result 存在： "result = arg1 op arg2" （省略 None 部分）
+        - 否则： "op arg1 arg2"（省略 None）
         """
-        self.code.append(f"{label}:")
+        out = []
+        for op, a1, a2, res in self.code:
+            # case: binary-like with result
+            if res is not None:
+                parts = []
+                parts.append(str(res))
+                parts.append("=")
+                # left operand
+                if a1 is not None:
+                    parts.append(str(a1))
+                # operation token
+                if op is not None:
+                    parts.append(str(op))
+                # right operand
+                if a2 is not None:
+                    parts.append(str(a2))
+                out.append(" ".join(parts))
+            else:
+                # no result: emit op and operands
+                parts = []
+                if op is not None:
+                    parts.append(str(op))
+                if a1 is not None:
+                    parts.append(str(a1))
+                if a2 is not None:
+                    parts.append(str(a2))
+                out.append(" ".join(parts))
+        return out
 
-    def get_code(self) -> List[str]:
-        """
-        返回当前生成的三地址码列表
-        """
-        return self.code
+    # 打印生成的 TAC（可供调试）
+    def dump(self):
+        for line in self.get_instructions():
+            print(line)
 
-    def write_code_to_file(self, filename: str):
-        """
-        输出三地址码到文件
-        """
-        with open(filename, "w") as f:
-            for line in self.code:
+    # 保存到文件
+    def save(self, filename):
+        # 确保目录存在
+        dirname = os.path.dirname(filename)
+        if dirname:
+            os.makedirs(dirname, exist_ok=True)
+        with open(filename, "w", encoding="utf-8") as f:
+            for line in self.get_instructions():
                 f.write(line + "\n")

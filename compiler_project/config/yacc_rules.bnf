@@ -1,54 +1,74 @@
-# ------------------------------------------
-# yacc_rules.bnf
-# ------------------------------------------
-# 定义语法规则 + 语义动作标签（不含代码）
-# ------------------------------------------
-
 <program> ::= <function_list>
-<function_list> ::= <function> <function_list> | ε
+
+<function_list> ::= <function> <function_list>
+<function_list> ::= ε
 
 <function> ::= <type> IDENTIFIER LPAREN <param_list> RPAREN LBRACE <stmt_list> RBRACE
 
-<param_list> ::= <param> COMMA <param_list> | <param> | ε
+<param_list> ::= <param> <param_list_tail>
+<param_list> ::= ε
+
+<param_list_tail> ::= COMMA <param> <param_list_tail>
+<param_list_tail> ::= ε
+
 <param> ::= <type> IDENTIFIER
 
-<type> ::= INT | VOID
+<type> ::= INT
+<type> ::= VOID
 
-<stmt_list> ::= <stmt> <stmt_list> | ε
+<stmt_list> ::= <stmt> <stmt_list>
+<stmt_list> ::= ε
 
-<stmt> ::= <var_decl>                  #var_decl_code
-        | <assign_stmt>                #assign_code
-        | <if_stmt>                    #if_code
-        | <while_stmt>                 #while_code
-        | <return_stmt>                #return_code
-        | <expr_stmt>                  #expr_code
-        | <block_stmt>                 #block_code
+<stmt> ::= <var_decl>          #var_decl_code
+<stmt> ::= <assign_stmt>       #assign_code
+<stmt> ::= <if_stmt>           #if_code
+<stmt> ::= <while_stmt>        #while_code
+<stmt> ::= <return_stmt>       #return_code
+<stmt> ::= <pure_expr_stmt>    #expr_code
+<stmt> ::= <block_stmt>        #block_code
 
 <var_decl> ::= <type> IDENTIFIER SEMI
+<assign_stmt> ::= SET IDENTIFIER ASSIGN <expr> SEMI
 
-<assign_stmt> ::= IDENTIFIER ASSIGN <expr> SEMI
-
-<if_stmt> ::= IF LPAREN <expr> RPAREN <stmt> ELSE <stmt>
-            | IF LPAREN <expr> RPAREN <stmt>
+<if_stmt> ::= IF LPAREN <expr> RPAREN <stmt> <if_tail>
+<if_tail> ::= ELSE <stmt>
+<if_tail> ::= ε
 
 <while_stmt> ::= WHILE LPAREN <expr> RPAREN <stmt>
 
-<return_stmt> ::= RETURN <expr> SEMI
-                | RETURN SEMI
+<return_stmt> ::= RETURN <return_tail>
+<return_tail> ::= <expr> SEMI
+<return_tail> ::= SEMI
 
-<expr_stmt> ::= <expr> SEMI
-
+<pure_expr_stmt> ::= <expr> SEMI
 <block_stmt> ::= LBRACE <stmt_list> RBRACE
 
-<expr> ::= <expr> PLUS <term>    #add
-         | <expr> MINUS <term>   #sub
-         | <term>
+<expr> ::= <add_expr> <rel_tail>
 
-<term> ::= <term> MULT <factor>  #mul
-         | <term> DIV <factor>   #div
-         | <factor>
+
+<rel_tail> ::= LT <add_expr>
+<rel_tail> ::= GT <add_expr>
+<rel_tail> ::= LE <add_expr>
+<rel_tail> ::= GE <add_expr>
+<rel_tail> ::= EQ <add_expr>
+<rel_tail> ::= NE <add_expr>
+<rel_tail> ::= ε
+
+<add_expr> ::= <mul_expr> <add_tail>
+
+
+<add_tail> ::= PLUS <mul_expr> <add_tail>
+<add_tail> ::= MINUS <mul_expr> <add_tail>
+<add_tail> ::= ε
+
+<mul_expr> ::= <factor> <mul_tail>
+
+
+<mul_tail> ::= MULT <factor> <mul_tail>
+<mul_tail> ::= DIV <factor> <mul_tail>
+<mul_tail> ::= ε
+
 
 <factor> ::= NUMBER
-           | STRING
-           | IDENTIFIER
-           | LPAREN <expr> RPAREN
+<factor> ::= IDENTIFIER
+<factor> ::= LPAREN <expr> RPAREN

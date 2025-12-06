@@ -1,17 +1,11 @@
-# ------------------------------------------
-# lex_rules.lex
-# ------------------------------------------
-# 定义 token 类型与正则
-# ------------------------------------------
-
 # 关键字
-IF      if
-ELSE    else
-WHILE   while
-FOR     for
-RETURN  return
-INT     int
-VOID    void
+IF          if
+ELSE        else
+WHILE       while
+RETURN      return
+INT         int
+VOID        void
+SET         set
 
 # 标识符
 IDENTIFIER  [a-zA-Z_][a-zA-Z0-9_]*
@@ -22,18 +16,22 @@ NUMBER      [0-9]+
 # 字符串字面量
 STRING      "([^"\\]|\\.)*"
 
-# 运算符
-PLUS        \+
-MINUS       \-
-MULT        \*
-DIV         /
-ASSIGN      =
+# 注释
+COMMENT     //.*
+COMMENT     /\*[\s\S]*?\*/
+
+# 运算符（多字符放前）
+LE          <=
+GE          >=
 EQ          ==
 NE          !=
 LT          <
 GT          >
-LE          <=
-GE          >=
+ASSIGN      =
+PLUS        \+
+MINUS       \-
+MULT        \*
+DIV         /
 
 # 界符
 LPAREN      \(
@@ -43,8 +41,5 @@ RBRACE      \}
 SEMI        ;
 COMMA       ,
 
-# 空白符忽略
-WHITESPACE  [ \t\n]+    -> skip
-
-# 文件结束
-EOF         <<EOF>>
+# 空白符
+WS          [ \t\r\n]+

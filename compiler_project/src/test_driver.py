@@ -1,31 +1,62 @@
-# src/test_driver.py
-# --------------------------------------------
-# 测试生成的编译器
-# 可以批量运行多个测试源程序，验证生成的 TAC 是否正确
-# --------------------------------------------
-
+# test_driver.py
 import os
-from main import compile_source_file
+import sys
 
-TEST_DIR = "test/"
-TAC_OUTPUT_DIR = "generated_compiler/tac_test_outputs/"
+# -----------------------------
+# 将项目根目录加入 sys.path
+# -----------------------------
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(PROJECT_ROOT)
 
-def run_all_tests():
-    if not os.path.exists(TAC_OUTPUT_DIR):
-        os.makedirs(TAC_OUTPUT_DIR)
+# -----------------------------
+# 导入生成的编译器
+# -----------------------------
+try:
+    from generated_compiler import lexer
+    from generated_compiler import parser
+except ImportError:
+    raise ImportError("请先运行 generator_main.py 生成目标编译器！")
 
-    test_files = [f for f in os.listdir(TEST_DIR) if f.endswith(".pl0") or f.endswith(".decaf")]
+# -----------------------------
+# 简单 Lexer + Parser 测试函数
+# -----------------------------
+def run_test(file_path):
+    if not os.path.exists(file_path):
+        print(f"测试文件不存在: {file_path}")
+        return
 
-    for test_file in test_files:
-        source_path = os.path.join(TEST_DIR, test_file)
-        tac_output_path = os.path.join(TAC_OUTPUT_DIR, test_file + ".tac")
-        print(f"\n[TEST] Compiling {test_file} ...")
-        try:
-            compile_source_file(source_path, tac_output_path)
-            print(f"[PASS] {test_file} compiled successfully.")
-        except Exception as e:
-            print(f"[FAIL] {test_file} failed: {e}")
+    with open(file_path, "r", encoding="utf-8") as f:
+        code = f.read()
 
+    # 1️⃣ 词法分析
+    token_list = lexer.tokenize(code)  # 直接调用 tokenize 函数
+    print("Token 列表:", token_list)
 
+    # 2️⃣ 语法分析
+    result = parser.parse(token_list)
+    if result:
+        print("语法分析通过 ✅")
+    else:
+        print("语法分析失败 ❌")
+
+    # 3️⃣ 如果 parser.py 会生成 TAC，可以直接查看 tac_output.txt
+    tac_file = os.path.join(PROJECT_ROOT, "generated_compiler", "tac_output.txt")
+    if os.path.exists(tac_file):
+        with open(tac_file, "r", encoding="utf-8") as f:
+            tac = f.read()
+        print("中间代码 / TAC:")
+        print(tac)
+    else:
+        print("未生成 TAC 文件。")
+
+# -----------------------------
+# CLI 运行
+# -----------------------------
 if __name__ == "__main__":
-    run_all_tests()
+    import argparse
+
+    parser_cli = argparse.ArgumentParser(description="测试生成的编译器")
+    parser_cli.add_argument("source_file", help="待测试的源代码文件")
+    args = parser_cli.parse_args()
+
+    run_test(args.source_file)

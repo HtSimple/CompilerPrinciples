@@ -1,91 +1,47 @@
-# src/runtime/token.py
-# --------------------------------------------
-# Token 数据结构，供 Lexer/Both Parser/CodeGen 使用
-# --------------------------------------------
+# token.py
+"""
+Node: 语法树/抽象语法树节点
+每个节点对应语法规则或语义动作的结果
+"""
 
-from enum import Enum, auto
-from dataclasses import dataclass
-
-
-class TokenType(Enum):
-    # 基本类型
-    IDENTIFIER = auto()      # 标识符
-    NUMBER = auto()          # 数字字面量
-    STRING = auto()          # 字符串字面量
-
-    # 关键字
-    IF = auto()
-    ELSE = auto()
-    WHILE = auto()
-    FOR = auto()
-    RETURN = auto()
-    INT = auto()
-    VOID = auto()
-
-    # 运算符
-    PLUS = auto()            # +
-    MINUS = auto()           # -
-    MULT = auto()            # *
-    DIV = auto()             # /
-    ASSIGN = auto()          # =
-    EQ = auto()              # ==
-    NE = auto()              # !=
-    LT = auto()              # <
-    GT = auto()              # >
-    LE = auto()              # <=
-    GE = auto()              # >=
-
-    # 界符
-    LPAREN = auto()          # (
-    RPAREN = auto()          # )
-    LBRACE = auto()          # {
-    RBRACE = auto()          # }
-    SEMI = auto()            # ;
-    COMMA = auto()           # ,
-
-    # 文件结束
-    EOF = auto()
-
-
-@dataclass
-class Token:
-    type: TokenType      # Token 类型
-    value: str           # 原始文本，例如 "abc"、"123"
-    line: int            # 所在行号
-    column: int          # 所在列号
+class Node:
+    def __init__(self, nodetype, children=None, value=None):
+        """
+        nodetype: 节点类型（如 <expr>, <assign_stmt>, #add 等）
+        children: 子节点列表
+        value: 叶子节点的值（如标识符名、数字、字符串）
+        """
+        self.nodetype = nodetype
+        self.children = children if children is not None else []
+        self.value = value
 
     def __repr__(self):
-        return f"Token({self.type.name}, {self.value!r}, {self.line}:{self.column})"
+        if self.value is not None:
+            return f"Node({self.nodetype}, value={self.value})"
+        elif self.children:
+            return f"Node({self.nodetype}, children={self.children})"
+        else:
+            return f"Node({self.nodetype})"
 
+    # 递归打印树结构
+    def pretty(self, indent=0):
+        pad = "  " * indent
+        if self.value is not None:
+            print(f"{pad}{self.nodetype}: {self.value}")
+        else:
+            print(f"{pad}{self.nodetype}")
+            for child in self.children:
+                if isinstance(child, Node):
+                    child.pretty(indent + 1)
+                else:
+                    print(f"{'  '*(indent+1)}{child}")
 
-class TokenStream:
-    """
-    Token 序列包装器，供 Parser 使用
-    提供 peek()/next()/expect() 等方法
-    """
-    def __init__(self, tokens):
-        self.tokens = tokens
-        self.pos = 0
-
-    def peek(self):
-        """返回当前 token，不移动位置"""
-        if self.pos < len(self.tokens):
-            return self.tokens[self.pos]
-        return Token(TokenType.EOF, "", -1, -1)
-
-    def next(self):
-        """返回当前 token，并将位置移动到下一个"""
-        tok = self.peek()
-        self.pos += 1
-        return tok
-
-    def expect(self, type_name: TokenType):
-        """匹配指定类型 token，否则抛出语法错误"""
-        tok = self.peek()
-        if tok.type != type_name:
-            raise SyntaxError(
-                f"Expected token {type_name.name}, got {tok.type.name} "
-                f"at line {tok.line}, col {tok.column}"
-            )
-        self.pos += 1
-        return tok
+    # 遍历所有节点，支持语义动作执行或中间代码生成
+    def traverse(self, func):
+        """
+        func: 一个回调函数，参数为 Node，自行处理 TAC 或 AST
+        """
+        func(self)
+        for child in self.children:
+            if isinstance(child, Node):
+                child.traverse(func)

@@ -1,0 +1,6 @@
+{
+    "python.analysis.extraPaths": [
+        "./compiler_project/generator",
+        "./compiler_project/generated_compiler"
+    ]
+}
