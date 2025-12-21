@@ -152,6 +152,70 @@ def move(states, ch):
 
 
 ###############################################################################
+# DFA 最小化
+###############################################################################
+
+def minimize_dfa(dfa_states, accept_map):
+    num_states = len(dfa_states)
+    alphabet = set()
+    for trans in dfa_states:
+        alphabet |= set(trans.keys())
+
+    # 1. 初始划分（按 token 类型 + 非接受）
+    partitions = {}
+    for s in range(num_states):
+        key = accept_map.get(s, None)  # None = 非接受
+        partitions.setdefault(key, set()).add(s)
+
+    P = list(partitions.values())
+
+    # 2. 反复细化
+    changed = True
+    while changed:
+        changed = False
+        new_P = []
+
+        for group in P:
+            splitter = {}
+            for s in group:
+                sig = []
+                for ch in alphabet:
+                    to = dfa_states[s].get(ch)
+                    idx = None
+                    for i, g in enumerate(P):
+                        if to in g:
+                            idx = i
+                            break
+                    sig.append(idx)
+                splitter.setdefault(tuple(sig), set()).add(s)
+
+            if len(splitter) > 1:
+                changed = True
+                new_P.extend(splitter.values())
+            else:
+                new_P.append(group)
+
+        P = new_P
+
+    # 3. 构造新 DFA
+    state_map = {}
+    for i, group in enumerate(P):
+        for s in group:
+            state_map[s] = i
+
+    new_dfa = [{} for _ in P]
+    new_accept = {}
+
+    for old_s, new_s in state_map.items():
+        for ch, to in dfa_states[old_s].items():
+            new_dfa[new_s][ch] = state_map[to]
+
+        if old_s in accept_map:
+            new_accept[new_s] = accept_map[old_s]
+
+    return new_dfa, new_accept
+
+###############################################################################
 # 生成 lexer.py
 ###############################################################################
 
@@ -281,5 +345,7 @@ class LexBuilder:
             accepts = [s.accepting for s in current if s.accepting]
             if accepts:
                 accept_map[idx] = accepts[0]
+
+        dfa_states, accept_map = minimize_dfa(dfa_states, accept_map)
 
         return generate_lexer(dfa_states, accept_map)
