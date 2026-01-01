@@ -2,12 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-ActionBuilder（最终干净 TAC 版）
-
-特性：
-- ✅ 变量声明不生成任何 TAC
-- ✅ 表达式 / 赋值生成标准三地址码
-- ✅ 无 eval / 无 Token 泄漏
+ActionBuilder（while / if / relop 最终修复版）
 """
 
 import os
@@ -27,13 +22,12 @@ TACGEN = TACContext()
 
 # ===================== 工具函数 =====================
 def v(x):
-    """统一取值：Node / Token / str"""
     if isinstance(x, Node):
         return x.value
     return str(x)
 
 
-# ===================== Action Functions =====================
+# ===================== 基本结构 =====================
 
 def program(children):
     node = Node("program", children)
@@ -41,7 +35,6 @@ def program(children):
     return node
 
 
-# ❌ 变量声明：只构 AST / 符号表，不生成 TAC
 def var_decl(children):
     return Node("var_decl", children)
 
@@ -53,12 +46,10 @@ def assign(children):
     return Node("assign", children)
 
 
-# ---------- 表达式 ----------
+# ===================== 表达式 =====================
 
 def expr(children):
-    left = children[0]
-    tail = children[1]
-    return tail(left)
+    return children[1](children[0])
 
 
 def expr_tail_empty(children):
@@ -66,35 +57,25 @@ def expr_tail_empty(children):
 
 
 def expr_tail_add(children):
-    term = children[1]
-    tail = children[2]
-
-    def apply(left):
+    term, tail = children[1], children[2]
+    def f(left):
         t = TACGEN.new_temp()
         TACGEN.emit("ADD", v(left), v(term), t)
         return tail(t)
-
-    return apply
+    return f
 
 
 def expr_tail_sub(children):
-    term = children[1]
-    tail = children[2]
-
-    def apply(left):
+    term, tail = children[1], children[2]
+    def f(left):
         t = TACGEN.new_temp()
         TACGEN.emit("SUB", v(left), v(term), t)
         return tail(t)
+    return f
 
-    return apply
-
-
-# ---------- 项 ----------
 
 def term(children):
-    left = children[0]
-    tail = children[1]
-    return tail(left)
+    return children[1](children[0])
 
 
 def term_tail_empty(children):
@@ -102,30 +83,22 @@ def term_tail_empty(children):
 
 
 def term_tail_mul(children):
-    factor = children[1]
-    tail = children[2]
-
-    def apply(left):
+    factor, tail = children[1], children[2]
+    def f(left):
         t = TACGEN.new_temp()
         TACGEN.emit("MUL", v(left), v(factor), t)
         return tail(t)
-
-    return apply
+    return f
 
 
 def term_tail_div(children):
-    factor = children[1]
-    tail = children[2]
-
-    def apply(left):
+    factor, tail = children[1], children[2]
+    def f(left):
         t = TACGEN.new_temp()
         TACGEN.emit("DIV", v(left), v(factor), t)
         return tail(t)
+    return f
 
-    return apply
-
-
-# ---------- 因子 ----------
 
 def factor_id(children):
     return children[0].value
@@ -139,11 +112,56 @@ def factor_expr(children):
     return children[1]
 
 
+# ===================== 关系运算符（关键修复点） =====================
+
+def relop(children):
+    # children[0] 是 Token，如 Token(LT, '<')
+    return children[0].type
+
+
+# ===================== 条件 =====================
+
+def condition_rel(children):
+    left, op, right = children
+    t = TACGEN.new_temp()
+    TACGEN.emit(op, v(left), v(right), t)
+    return t
+
+
+def condition_odd(children):
+    exprv = children[1]
+    t = TACGEN.new_temp()
+    TACGEN.emit("ODD", v(exprv), None, t)
+    return t
+
+
+# ===================== if / while =====================
+
+def if_stmt(children):
+    cond = children[1]
+    Lend = TACGEN.new_label()
+    TACGEN.emit("IF_FALSE", v(cond), None, Lend)
+    return Node("if_stmt", children)
+
+
+def while_stmt(children):
+    cond = children[1]
+    Lbegin = TACGEN.new_label()
+    Lend = TACGEN.new_label()
+
+    TACGEN.emit("LABEL", None, None, Lbegin)
+    TACGEN.emit("IF_FALSE", v(cond), None, Lend)
+    # 循环体 stmt 的 TAC 已在归约时生成
+    TACGEN.emit("GOTO", None, None, Lbegin)
+    TACGEN.emit("LABEL", None, None, Lend)
+
+    return Node("while_stmt", children)
+
+
 # ===================== ACTION TABLE =====================
 
 ACTIONS = {
     "<program> -> <decl_part> <compound_stmt> DOT": program,
-
     "<var_decl_part> -> VAR <ident_list> SEMI": var_decl,
     "<assign_stmt> -> IDENTIFIER ASSIGN <expr>": assign,
 
@@ -160,6 +178,19 @@ ACTIONS = {
     "<factor> -> IDENTIFIER": factor_id,
     "<factor> -> NUMBER": factor_num,
     "<factor> -> LPAREN <expr> RPAREN": factor_expr,
+
+    "<relop> -> EQ": relop,
+    "<relop> -> NE": relop,
+    "<relop> -> LT": relop,
+    "<relop> -> GT": relop,
+    "<relop> -> LE": relop,
+    "<relop> -> GE": relop,
+
+    "<condition> -> <expr> <relop> <expr>": condition_rel,
+    "<condition> -> ODD <expr>": condition_odd,
+
+    "<if_stmt> -> IF <condition> THEN <stmt>": if_stmt,
+    "<while_stmt> -> WHILE <condition> DO <stmt>": while_stmt,
 }
 
 
@@ -170,9 +201,6 @@ class ActionBuilder:
         self.parser_file = parser_file
 
     def build(self) -> str:
-        if not os.path.exists(self.parser_file):
-            raise FileNotFoundError(self.parser_file)
-
         with open(self.parser_file, "r", encoding="utf-8") as f:
             parser_code = f.read()
 
@@ -194,8 +222,8 @@ class ActionBuilder:
                 written.add(func)
 
         injected.append("ACTIONS = {\n")
-        for k, func in ACTIONS.items():
-            injected.append(f"    {k!r}: {func.__name__},\n")
+        for k, f in ACTIONS.items():
+            injected.append(f"    {k!r}: {f.__name__},\n")
         injected.append("}\n\n")
 
         injected.append("EXPORT_TAC = TACGEN\n")

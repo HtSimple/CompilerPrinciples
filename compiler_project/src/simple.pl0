@@ -1,6 +1,5 @@
-var a, b, c;
-begin
-    a := 1;
-    b := 2;
-    c := a + b;
-end.
+VAR a, b;
+BEGIN
+    a := 2;
+    b := a + 3 * 4
+END.

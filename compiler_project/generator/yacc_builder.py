@@ -5,7 +5,7 @@
 yacc_builder.py
 
 从 BNF 文法自动构造 LL(1) 预测分析表，
-并生成 temp_parser.py（支持语义动作注入）
+并生成 parser.py（支持语义动作注入 + 健壮错误提示）
 """
 
 from collections import defaultdict
@@ -30,10 +30,6 @@ class YaccBuilder:
 
         self.start_symbol = None
 
-
-
-    # --------------------------------------------------
-    # 读取 BNF 文法
     # --------------------------------------------------
     def load_grammar(self):
         if not os.path.exists(self.bnf_file):
@@ -94,8 +90,6 @@ class YaccBuilder:
         return sym.startswith("<") and sym.endswith(">")
 
     # --------------------------------------------------
-    # FIRST（标准算法）
-    # --------------------------------------------------
     def compute_first(self):
         for t in self.terminals:
             self.first[t] = {t}
@@ -113,8 +107,6 @@ class YaccBuilder:
                     if len(self.first[A]) > before:
                         changed = True
 
-    # --------------------------------------------------
-    # FOLLOW（标准算法）
     # --------------------------------------------------
     def compute_follow(self):
         self.follow[self.start_symbol].add(ENDMARK)
@@ -140,8 +132,6 @@ class YaccBuilder:
                             changed = True
 
     # --------------------------------------------------
-    # FIRST(α)
-    # --------------------------------------------------
     def first_of_string(self, symbols):
         result = set()
         for sym in symbols:
@@ -155,8 +145,6 @@ class YaccBuilder:
         return result
 
     # --------------------------------------------------
-    # 构造 LL(1) 表（含 start symbol 兜底）
-    # --------------------------------------------------
     def build_table(self):
         for A, prods in self.productions.items():
             for prod in prods:
@@ -167,13 +155,12 @@ class YaccBuilder:
                     for b in self.follow[A]:
                         self.table[(A, b)] = prod
 
-        # ✅ 起始符 FIRST 强制补全（PL/0 必需）
         for prod in self.productions[self.start_symbol]:
             for t in self.first_of_string(prod) - {EPSILON}:
                 self.table[(self.start_symbol, t)] = prod
 
     # --------------------------------------------------
-    # 生成 parser（REDUCE 原子化）
+    # 生成 parser（仅增强错误提示，逻辑不变）
     # --------------------------------------------------
     def generate_parser(self, out_path):
         lines = [
@@ -181,9 +168,8 @@ class YaccBuilder:
             "# -*- coding: utf-8 -*-",
             "",
             "from collections import deque",
-            "from generator.action_builder import TAC_OUTPUT_FILE",
             "",
-            "ACTIONS = {}  # 将由 ActionBuilder 注入",
+            "ACTIONS = {}",
             "",
             "def parse(tokens, verbose=False):",
             "    token_types = [t.type for t in tokens] + ['$']",
@@ -217,11 +203,21 @@ class YaccBuilder:
             "                value_stack.append(tokens[i])",
             "                i += 1",
             "                continue",
-            "            raise SyntaxError(f'期望 {top}, 得到 {lookahead}')",
+            "",
+            "            tok = tokens[i]",
+            "            line = getattr(tok, 'line', '?')",
+            "            raise SyntaxError(",
+            "                f\"语法错误（第 {line} 行）：期望 {top}，得到 {tok.type} ({tok.value})\"",
+            "            )",
             "",
             "        key = (top, lookahead)",
             "        if key not in PARSE_TABLE:",
-            "            raise SyntaxError(f'分析表无条目: {key}')",
+            "            tok = tokens[i]",
+            "            line = getattr(tok, 'line', '?')",
+            "            expected = sorted({t for (A, t) in PARSE_TABLE if A == top})",
+            "            raise SyntaxError(",
+            "                f\"语法错误（第 {line} 行）：遇到 {tok.type} ({tok.value})，期望 {expected}\"",
+            "            )",
             "",
             "        prod = PARSE_TABLE[key]",
             "        stack.append(('@REDUCE@', top, prod))",
@@ -237,12 +233,12 @@ class YaccBuilder:
         for (A, t), prod in sorted(self.table.items()):
             lines.append(f"    ({A!r}, {t!r}): {prod!r},")
 
-        lines += ["}"]
+        lines.append("}")
 
         with open(out_path, "w", encoding="utf-8") as f:
             f.write("\n".join(lines))
 
-        print(f"✓ temp_parser.py 已生成 -> {out_path}")
+        print(f"✓ parser 已生成 -> {out_path}")
 
     # --------------------------------------------------
     def run(self, out_path):

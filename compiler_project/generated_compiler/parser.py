@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 
 from collections import deque
+
 from generator.action_builder import TAC_OUTPUT_FILE
 
-ACTIONS = {}  # 将由 ActionBuilder 注入
+ACTIONS = {}
 
 def parse(tokens, verbose=False):
     token_types = [t.type for t in tokens] + ['$']
@@ -38,11 +39,21 @@ def parse(tokens, verbose=False):
                 value_stack.append(tokens[i])
                 i += 1
                 continue
-            raise SyntaxError(f'期望 {top}, 得到 {lookahead}')
+
+            tok = tokens[i]
+            line = getattr(tok, 'line', '?')
+            raise SyntaxError(
+                f"语法错误（第 {line} 行）：期望 {top}，得到 {tok.type} ({tok.value})"
+            )
 
         key = (top, lookahead)
         if key not in PARSE_TABLE:
-            raise SyntaxError(f'分析表无条目: {key}')
+            tok = tokens[i]
+            line = getattr(tok, 'line', '?')
+            expected = sorted({t for (A, t) in PARSE_TABLE if A == top})
+            raise SyntaxError(
+                f"语法错误（第 {line} 行）：遇到 {tok.type} ({tok.value})，期望 {expected}"
+            )
 
         prod = PARSE_TABLE[key]
         stack.append(('@REDUCE@', top, prod))
@@ -149,7 +160,6 @@ from src.runtime.token import Node
 TACGEN = TACContext()
 
 def v(x):
-    """统一取值：Node / Token / str"""
     if isinstance(x, Node):
         return x.value
     return str(x)
@@ -173,33 +183,25 @@ def assign(children):
 
 
 def expr(children):
-    left = children[0]
-    tail = children[1]
-    return tail(left)
+    return children[1](children[0])
 
 
 def expr_tail_add(children):
-    term = children[1]
-    tail = children[2]
-
-    def apply(left):
+    term, tail = children[1], children[2]
+    def f(left):
         t = TACGEN.new_temp()
         TACGEN.emit("ADD", v(left), v(term), t)
         return tail(t)
-
-    return apply
+    return f
 
 
 def expr_tail_sub(children):
-    term = children[1]
-    tail = children[2]
-
-    def apply(left):
+    term, tail = children[1], children[2]
+    def f(left):
         t = TACGEN.new_temp()
         TACGEN.emit("SUB", v(left), v(term), t)
         return tail(t)
-
-    return apply
+    return f
 
 
 def expr_tail_empty(children):
@@ -207,33 +209,25 @@ def expr_tail_empty(children):
 
 
 def term(children):
-    left = children[0]
-    tail = children[1]
-    return tail(left)
+    return children[1](children[0])
 
 
 def term_tail_mul(children):
-    factor = children[1]
-    tail = children[2]
-
-    def apply(left):
+    factor, tail = children[1], children[2]
+    def f(left):
         t = TACGEN.new_temp()
         TACGEN.emit("MUL", v(left), v(factor), t)
         return tail(t)
-
-    return apply
+    return f
 
 
 def term_tail_div(children):
-    factor = children[1]
-    tail = children[2]
-
-    def apply(left):
+    factor, tail = children[1], children[2]
+    def f(left):
         t = TACGEN.new_temp()
         TACGEN.emit("DIV", v(left), v(factor), t)
         return tail(t)
-
-    return apply
+    return f
 
 
 def term_tail_empty(children):
@@ -252,6 +246,46 @@ def factor_expr(children):
     return children[1]
 
 
+def relop(children):
+    # children[0] 是 Token，如 Token(LT, '<')
+    return children[0].type
+
+
+def condition_rel(children):
+    left, op, right = children
+    t = TACGEN.new_temp()
+    TACGEN.emit(op, v(left), v(right), t)
+    return t
+
+
+def condition_odd(children):
+    exprv = children[1]
+    t = TACGEN.new_temp()
+    TACGEN.emit("ODD", v(exprv), None, t)
+    return t
+
+
+def if_stmt(children):
+    cond = children[1]
+    Lend = TACGEN.new_label()
+    TACGEN.emit("IF_FALSE", v(cond), None, Lend)
+    return Node("if_stmt", children)
+
+
+def while_stmt(children):
+    cond = children[1]
+    Lbegin = TACGEN.new_label()
+    Lend = TACGEN.new_label()
+
+    TACGEN.emit("LABEL", None, None, Lbegin)
+    TACGEN.emit("IF_FALSE", v(cond), None, Lend)
+    # 循环体 stmt 的 TAC 已在归约时生成
+    TACGEN.emit("GOTO", None, None, Lbegin)
+    TACGEN.emit("LABEL", None, None, Lend)
+
+    return Node("while_stmt", children)
+
+
 ACTIONS = {
     '<program> -> <decl_part> <compound_stmt> DOT': program,
     '<var_decl_part> -> VAR <ident_list> SEMI': var_decl,
@@ -267,6 +301,16 @@ ACTIONS = {
     '<factor> -> IDENTIFIER': factor_id,
     '<factor> -> NUMBER': factor_num,
     '<factor> -> LPAREN <expr> RPAREN': factor_expr,
+    '<relop> -> EQ': relop,
+    '<relop> -> NE': relop,
+    '<relop> -> LT': relop,
+    '<relop> -> GT': relop,
+    '<relop> -> LE': relop,
+    '<relop> -> GE': relop,
+    '<condition> -> <expr> <relop> <expr>': condition_rel,
+    '<condition> -> ODD <expr>': condition_odd,
+    '<if_stmt> -> IF <condition> THEN <stmt>': if_stmt,
+    '<while_stmt> -> WHILE <condition> DO <stmt>': while_stmt,
 }
 
 EXPORT_TAC = TACGEN
