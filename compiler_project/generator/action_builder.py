@@ -2,23 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-ActionBuilder（与当前 yacc_builder.py 100% 对齐版）
+ActionBuilder（最终干净 TAC 版）
 
-设计前提（非常重要）：
-- yacc_builder.py 生成的 temp_parser.py 使用 **@REDUCE@ 标记**
-- 归约点格式为：
-    ('@REDUCE@', lhs, rhs)
-- parser 在归约时执行：
-    key = f"{lhs} -> {' '.join(rhs)}"
-    ACTIONS[key](children)
-
-本 ActionBuilder 只做一件事：
-👉 向 temp_parser.py 注入：
-   1. TACContext / Node
-   2. 所有 action 函数
-   3. ACTIONS 映射（key = 产生式字符串）
-❌ 不再生成新的 parse
-❌ 不再二次驱动语法分析
+特性：
+- ✅ 变量声明不生成任何 TAC
+- ✅ 表达式 / 赋值生成标准三地址码
+- ✅ 无 eval / 无 Token 泄漏
 """
 
 import os
@@ -28,14 +17,23 @@ from src.runtime.ctx import TACContext
 from src.runtime.token import Node
 
 
-# ===================== 三地址码输出位置 =====================
+# ===================== TAC 输出位置 =====================
 TAC_OUTPUT_FILE = os.path.join("generated_compiler", "tac_output.txt")
 
 
-# ===================== Action Functions =====================
-
+# ===================== 全局 TAC 上下文 =====================
 TACGEN = TACContext()
 
+
+# ===================== 工具函数 =====================
+def v(x):
+    """统一取值：Node / Token / str"""
+    if isinstance(x, Node):
+        return x.value
+    return str(x)
+
+
+# ===================== Action Functions =====================
 
 def program(children):
     node = Node("program", children)
@@ -43,75 +41,125 @@ def program(children):
     return node
 
 
+# ❌ 变量声明：只构 AST / 符号表，不生成 TAC
 def var_decl(children):
-    node = Node("var_decl", children)
-    for c in children:
-        TACGEN.emit("VAR", str(c))
-    return node
+    return Node("var_decl", children)
 
 
 def assign(children):
-    node = Node("assign", children)
-    left = str(children[0])
-    right = str(children[-1])
-    TACGEN.emit("ASSIGN", right, None, left)
-    return node
+    left = children[0].value
+    right = children[2]
+    TACGEN.emit("ASSIGN", v(right), None, left)
+    return Node("assign", children)
 
 
-def add(children):
-    node = Node("add", children)
-    t = TACGEN.new_temp()
-    TACGEN.emit("ADD", str(children[0]), str(children[2]), t)
-    return t
+# ---------- 表达式 ----------
+
+def expr(children):
+    left = children[0]
+    tail = children[1]
+    return tail(left)
 
 
-def sub(children):
-    node = Node("sub", children)
-    t = TACGEN.new_temp()
-    TACGEN.emit("SUB", str(children[0]), str(children[2]), t)
-    return t
+def expr_tail_empty(children):
+    return lambda x: x
 
 
-def mul(children):
-    node = Node("mul", children)
-    t = TACGEN.new_temp()
-    TACGEN.emit("MUL", str(children[0]), str(children[2]), t)
-    return t
+def expr_tail_add(children):
+    term = children[1]
+    tail = children[2]
+
+    def apply(left):
+        t = TACGEN.new_temp()
+        TACGEN.emit("ADD", v(left), v(term), t)
+        return tail(t)
+
+    return apply
 
 
-def div(children):
-    node = Node("div", children)
-    t = TACGEN.new_temp()
-    TACGEN.emit("DIV", str(children[0]), str(children[2]), t)
-    return t
+def expr_tail_sub(children):
+    term = children[1]
+    tail = children[2]
+
+    def apply(left):
+        t = TACGEN.new_temp()
+        TACGEN.emit("SUB", v(left), v(term), t)
+        return tail(t)
+
+    return apply
 
 
-def pass_through(children):
-    """默认动作：直接返回唯一子节点"""
-    return children[0] if children else None
+# ---------- 项 ----------
+
+def term(children):
+    left = children[0]
+    tail = children[1]
+    return tail(left)
 
 
-# ===================== ACTION TABLE（产生式字符串 → 函数） =====================
+def term_tail_empty(children):
+    return lambda x: x
+
+
+def term_tail_mul(children):
+    factor = children[1]
+    tail = children[2]
+
+    def apply(left):
+        t = TACGEN.new_temp()
+        TACGEN.emit("MUL", v(left), v(factor), t)
+        return tail(t)
+
+    return apply
+
+
+def term_tail_div(children):
+    factor = children[1]
+    tail = children[2]
+
+    def apply(left):
+        t = TACGEN.new_temp()
+        TACGEN.emit("DIV", v(left), v(factor), t)
+        return tail(t)
+
+    return apply
+
+
+# ---------- 因子 ----------
+
+def factor_id(children):
+    return children[0].value
+
+
+def factor_num(children):
+    return children[0].value
+
+
+def factor_expr(children):
+    return children[1]
+
+
+# ===================== ACTION TABLE =====================
 
 ACTIONS = {
     "<program> -> <decl_part> <compound_stmt> DOT": program,
 
     "<var_decl_part> -> VAR <ident_list> SEMI": var_decl,
-
     "<assign_stmt> -> IDENTIFIER ASSIGN <expr>": assign,
 
-    "<expr_tail> -> PLUS <term> <expr_tail>": add,
-    "<expr_tail> -> MINUS <term> <expr_tail>": sub,
+    "<expr> -> <term> <expr_tail>": expr,
+    "<expr_tail> -> PLUS <term> <expr_tail>": expr_tail_add,
+    "<expr_tail> -> MINUS <term> <expr_tail>": expr_tail_sub,
+    "<expr_tail> -> ε": expr_tail_empty,
 
-    "<term_tail> -> MULT <factor> <term_tail>": mul,
-    "<term_tail> -> DIV <factor> <term_tail>": div,
+    "<term> -> <factor> <term_tail>": term,
+    "<term_tail> -> MULT <factor> <term_tail>": term_tail_mul,
+    "<term_tail> -> DIV <factor> <term_tail>": term_tail_div,
+    "<term_tail> -> ε": term_tail_empty,
 
-    # 兜底规则（无语义，仅传递）
-    "<expr> -> <term> <expr_tail>": pass_through,
-    "<term> -> <factor> <term_tail>": pass_through,
-    "<factor> -> IDENTIFIER": pass_through,
-    "<factor> -> NUMBER": pass_through,
-    "<factor> -> LPAREN <expr> RPAREN": pass_through,
+    "<factor> -> IDENTIFIER": factor_id,
+    "<factor> -> NUMBER": factor_num,
+    "<factor> -> LPAREN <expr> RPAREN": factor_expr,
 }
 
 
@@ -135,6 +183,9 @@ class ActionBuilder:
         injected.append("from src.runtime.token import Node\n\n")
         injected.append("TACGEN = TACContext()\n\n")
 
+        injected.append(inspect.getsource(v))
+        injected.append("\n\n")
+
         written = set()
         for func in ACTIONS.values():
             if func not in written:
@@ -143,11 +194,10 @@ class ActionBuilder:
                 written.add(func)
 
         injected.append("ACTIONS = {\n")
-        for k, v in ACTIONS.items():
-            injected.append(f"    {k!r}: {v.__name__},\n")
+        for k, func in ACTIONS.items():
+            injected.append(f"    {k!r}: {func.__name__},\n")
         injected.append("}\n\n")
 
-        injected.append("# 对外导出 TAC\n")
         injected.append("EXPORT_TAC = TACGEN\n")
 
         return "".join(injected)

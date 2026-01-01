@@ -148,6 +148,13 @@ from src.runtime.token import Node
 
 TACGEN = TACContext()
 
+def v(x):
+    """统一取值：Node / Token / str"""
+    if isinstance(x, Node):
+        return x.value
+    return str(x)
+
+
 def program(children):
     node = Node("program", children)
     TACGEN.save(TAC_OUTPUT_FILE)
@@ -155,67 +162,111 @@ def program(children):
 
 
 def var_decl(children):
-    node = Node("var_decl", children)
-    for c in children:
-        TACGEN.emit("VAR", str(c))
-    return node
+    return Node("var_decl", children)
 
 
 def assign(children):
-    node = Node("assign", children)
-    left = str(children[0])
-    right = str(children[-1])
-    TACGEN.emit("ASSIGN", right, None, left)
-    return node
+    left = children[0].value
+    right = children[2]
+    TACGEN.emit("ASSIGN", v(right), None, left)
+    return Node("assign", children)
 
 
-def add(children):
-    node = Node("add", children)
-    t = TACGEN.new_temp()
-    TACGEN.emit("ADD", str(children[0]), str(children[2]), t)
-    return t
+def expr(children):
+    left = children[0]
+    tail = children[1]
+    return tail(left)
 
 
-def sub(children):
-    node = Node("sub", children)
-    t = TACGEN.new_temp()
-    TACGEN.emit("SUB", str(children[0]), str(children[2]), t)
-    return t
+def expr_tail_add(children):
+    term = children[1]
+    tail = children[2]
+
+    def apply(left):
+        t = TACGEN.new_temp()
+        TACGEN.emit("ADD", v(left), v(term), t)
+        return tail(t)
+
+    return apply
 
 
-def mul(children):
-    node = Node("mul", children)
-    t = TACGEN.new_temp()
-    TACGEN.emit("MUL", str(children[0]), str(children[2]), t)
-    return t
+def expr_tail_sub(children):
+    term = children[1]
+    tail = children[2]
+
+    def apply(left):
+        t = TACGEN.new_temp()
+        TACGEN.emit("SUB", v(left), v(term), t)
+        return tail(t)
+
+    return apply
 
 
-def div(children):
-    node = Node("div", children)
-    t = TACGEN.new_temp()
-    TACGEN.emit("DIV", str(children[0]), str(children[2]), t)
-    return t
+def expr_tail_empty(children):
+    return lambda x: x
 
 
-def pass_through(children):
-    """默认动作：直接返回唯一子节点"""
-    return children[0] if children else None
+def term(children):
+    left = children[0]
+    tail = children[1]
+    return tail(left)
+
+
+def term_tail_mul(children):
+    factor = children[1]
+    tail = children[2]
+
+    def apply(left):
+        t = TACGEN.new_temp()
+        TACGEN.emit("MUL", v(left), v(factor), t)
+        return tail(t)
+
+    return apply
+
+
+def term_tail_div(children):
+    factor = children[1]
+    tail = children[2]
+
+    def apply(left):
+        t = TACGEN.new_temp()
+        TACGEN.emit("DIV", v(left), v(factor), t)
+        return tail(t)
+
+    return apply
+
+
+def term_tail_empty(children):
+    return lambda x: x
+
+
+def factor_id(children):
+    return children[0].value
+
+
+def factor_num(children):
+    return children[0].value
+
+
+def factor_expr(children):
+    return children[1]
 
 
 ACTIONS = {
     '<program> -> <decl_part> <compound_stmt> DOT': program,
     '<var_decl_part> -> VAR <ident_list> SEMI': var_decl,
     '<assign_stmt> -> IDENTIFIER ASSIGN <expr>': assign,
-    '<expr_tail> -> PLUS <term> <expr_tail>': add,
-    '<expr_tail> -> MINUS <term> <expr_tail>': sub,
-    '<term_tail> -> MULT <factor> <term_tail>': mul,
-    '<term_tail> -> DIV <factor> <term_tail>': div,
-    '<expr> -> <term> <expr_tail>': pass_through,
-    '<term> -> <factor> <term_tail>': pass_through,
-    '<factor> -> IDENTIFIER': pass_through,
-    '<factor> -> NUMBER': pass_through,
-    '<factor> -> LPAREN <expr> RPAREN': pass_through,
+    '<expr> -> <term> <expr_tail>': expr,
+    '<expr_tail> -> PLUS <term> <expr_tail>': expr_tail_add,
+    '<expr_tail> -> MINUS <term> <expr_tail>': expr_tail_sub,
+    '<expr_tail> -> ε': expr_tail_empty,
+    '<term> -> <factor> <term_tail>': term,
+    '<term_tail> -> MULT <factor> <term_tail>': term_tail_mul,
+    '<term_tail> -> DIV <factor> <term_tail>': term_tail_div,
+    '<term_tail> -> ε': term_tail_empty,
+    '<factor> -> IDENTIFIER': factor_id,
+    '<factor> -> NUMBER': factor_num,
+    '<factor> -> LPAREN <expr> RPAREN': factor_expr,
 }
 
-# 对外导出 TAC
 EXPORT_TAC = TACGEN
