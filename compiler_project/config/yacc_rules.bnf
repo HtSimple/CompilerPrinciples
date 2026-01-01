@@ -1,74 +1,87 @@
-<program> ::= <function_list>
+# ===================== PL/0 语法规则（LL(1) 修正版） =====================
 
-<function_list> ::= <function> <function_list>
-<function_list> ::= ε
-
-<function> ::= <type> IDENTIFIER LPAREN <param_list> RPAREN LBRACE <stmt_list> RBRACE
-
-<param_list> ::= <param> <param_list_tail>
-<param_list> ::= ε
-
-<param_list_tail> ::= COMMA <param> <param_list_tail>
-<param_list_tail> ::= ε
-
-<param> ::= <type> IDENTIFIER
-
-<type> ::= INT
-<type> ::= VOID
-
-<stmt_list> ::= <stmt> <stmt_list>
-<stmt_list> ::= ε
-
-<stmt> ::= <var_decl>          #var_decl_code
-<stmt> ::= <assign_stmt>       #assign_code
-<stmt> ::= <if_stmt>           #if_code
-<stmt> ::= <while_stmt>        #while_code
-<stmt> ::= <return_stmt>       #return_code
-<stmt> ::= <pure_expr_stmt>    #expr_code
-<stmt> ::= <block_stmt>        #block_code
-
-<var_decl> ::= <type> IDENTIFIER SEMI
-<assign_stmt> ::= SET IDENTIFIER ASSIGN <expr> SEMI
-
-<if_stmt> ::= IF LPAREN <expr> RPAREN <stmt> <if_tail>
-<if_tail> ::= ELSE <stmt>
-<if_tail> ::= ε
-
-<while_stmt> ::= WHILE LPAREN <expr> RPAREN <stmt>
-
-<return_stmt> ::= RETURN <return_tail>
-<return_tail> ::= <expr> SEMI
-<return_tail> ::= SEMI
-
-<pure_expr_stmt> ::= <expr> SEMI
-<block_stmt> ::= LBRACE <stmt_list> RBRACE
-
-<expr> ::= <add_expr> <rel_tail>
+<program> ::= <decl_part> <compound_stmt> DOT
 
 
-<rel_tail> ::= LT <add_expr>
-<rel_tail> ::= GT <add_expr>
-<rel_tail> ::= LE <add_expr>
-<rel_tail> ::= GE <add_expr>
-<rel_tail> ::= EQ <add_expr>
-<rel_tail> ::= NE <add_expr>
-<rel_tail> ::= ε
+# ---------- 声明部分（显式拆分，解决 program 起始冲突） ----------
 
-<add_expr> ::= <mul_expr> <add_tail>
+<decl_part> ::= <const_decl_part> <var_decl_part> <proc_decl_part>
+              | <var_decl_part> <proc_decl_part>
+              | <proc_decl_part>
+              | ε
 
 
-<add_tail> ::= PLUS <mul_expr> <add_tail>
-<add_tail> ::= MINUS <mul_expr> <add_tail>
-<add_tail> ::= ε
+<const_decl_part> ::= CONST <const_list> SEMI
 
-<mul_expr> ::= <factor> <mul_tail>
+<const_list> ::= IDENTIFIER EQ NUMBER <const_list_tail>
 
-
-<mul_tail> ::= MULT <factor> <mul_tail>
-<mul_tail> ::= DIV <factor> <mul_tail>
-<mul_tail> ::= ε
+<const_list_tail> ::= COMMA IDENTIFIER EQ NUMBER <const_list_tail>
+                    | ε
 
 
-<factor> ::= NUMBER
+<var_decl_part> ::= VAR <ident_list> SEMI
+
+<ident_list> ::= IDENTIFIER <ident_list_rest>
+
+<ident_list_rest> ::= COMMA IDENTIFIER <ident_list_rest>
+                    | ε
+
+
+<proc_decl_part> ::= <proc_decl> <proc_decl_part>
+                   | ε
+
+<proc_decl> ::= PROCEDURE IDENTIFIER SEMI <program> SEMI
+
+
+# ---------- 语句部分 ----------
+
+<compound_stmt> ::= BEGIN <stmt_list> END
+
+<stmt_list> ::= <stmt> <stmt_list_tail>
+
+<stmt_list_tail> ::= SEMI <stmt> <stmt_list_tail>
+                   | ε
+
+
+<stmt> ::= <assign_stmt>
+         | <if_stmt>
+         | <while_stmt>
+         | <call_stmt>
+         | <compound_stmt>
+         | ε
+
+
+<assign_stmt> ::= IDENTIFIER ASSIGN <expr>
+
+<call_stmt> ::= CALL IDENTIFIER
+
+<if_stmt> ::= IF <condition> THEN <stmt>
+
+<while_stmt> ::= WHILE <condition> DO <stmt>
+
+
+# ---------- 表达式 ----------
+
+<condition> ::= ODD <expr>
+              | <expr> <relop> <expr>
+
+<relop> ::= EQ | NE | LT | GT | LE | GE
+
+
+<expr> ::= <term> <expr_tail>
+
+<expr_tail> ::= PLUS <term> <expr_tail>
+              | MINUS <term> <expr_tail>
+              | ε
+
+
+<term> ::= <factor> <term_tail>
+
+<term_tail> ::= MULT <factor> <term_tail>
+              | DIV <factor> <term_tail>
+              | ε
+
+
 <factor> ::= IDENTIFIER
-<factor> ::= LPAREN <expr> RPAREN
+           | NUMBER
+           | LPAREN <expr> RPAREN

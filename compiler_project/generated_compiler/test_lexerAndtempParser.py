@@ -140,51 +140,44 @@ if __name__ == "__main__":
 
     test_cases = {
         "✅ 正确程序": """
-int foo(int x) {
-    int y;
-    set y = x * 5 + 3;
-    if (y > 10) {
-        return y;
-    }
-    while (y < 20) {
-        set y = y + 1;
-    }
-    return 0;
-}
+var a, b, c;
 
-void bar() {
-    return;
-}
-""",
+begin
+    a := 5;
+    b := 10;
+    c := a + b * 2;
+end.
 
-        "❌ 词法错误-非法字符": """
-int main() {
-    int a;
-    set a = 3 @ 5;
-    return a;
-}
-""",
-
-        "❌ 语法错误-缺少分号": """
-int main() {
-    int a
-    return a;
-}
-""",
-
-        "❌ 语法错误-括号不匹配": """
-int main( {
-    return 0;
-}
-""",
-
-        "❌ 语法错误-if 缺右括号": """
-int main() {
-    if (1 > 0 {
-        return 1;
-    }
-}
-"""
+ """
+#
+#         "❌ 词法错误-非法字符": """
+# int main() {
+#     int a;
+#     set a = 3 @ 5;
+#     return a;
+# }
+# """,
+#
+#         "❌ 语法错误-缺少分号": """
+# int main() {
+#     int a
+#     return a;
+# }
+# """,
+#
+#         "❌ 语法错误-括号不匹配": """
+# int main( {
+#     return 0;
+# }
+# """,
+#
+#         "❌ 语法错误-if 缺右括号": """
+# int main() {
+#     if (1 > 0 {
+#         return 1;
+#     }
+# }
+# """
     }
 
     for name, code in test_cases.items():
@@ -215,7 +208,7 @@ int main() {
         try:
             print("\n[2] 语法分析（LL(1)）")
             token_types = [t.type for t in tokens] + ['$']
-            success = parse(token_types, verbose=True)
+            success = parse(tokens, verbose=True)
 
             if not success:
                 print("❌ 语法分析失败")

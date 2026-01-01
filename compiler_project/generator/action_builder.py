@@ -1,179 +1,153 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+ActionBuilder（与当前 yacc_builder.py 100% 对齐版）
+
+设计前提（非常重要）：
+- yacc_builder.py 生成的 temp_parser.py 使用 **@REDUCE@ 标记**
+- 归约点格式为：
+    ('@REDUCE@', lhs, rhs)
+- parser 在归约时执行：
+    key = f"{lhs} -> {' '.join(rhs)}"
+    ACTIONS[key](children)
+
+本 ActionBuilder 只做一件事：
+👉 向 temp_parser.py 注入：
+   1. TACContext / Node
+   2. 所有 action 函数
+   3. ACTIONS 映射（key = 产生式字符串）
+❌ 不再生成新的 parse
+❌ 不再二次驱动语法分析
+"""
+
 import os
 import inspect
 
 from src.runtime.ctx import TACContext
 from src.runtime.token import Node
 
+
+# ===================== 三地址码输出位置 =====================
 TAC_OUTPUT_FILE = os.path.join("generated_compiler", "tac_output.txt")
-# 在这个模块里保留一个 TACGEN 仅作为占位（注意：action 函数源码会被注入到 parser.py，
-# 注入处会重新定义 TACGEN = TACContext()，注入后的 program() 将使用注入处的 TACGEN）
+
+
+# ===================== Action Functions =====================
+
 TACGEN = TACContext()
 
-# ----------------- 动作函数 -----------------
+
 def program(children):
     node = Node("program", children)
-    # 输出 TAC：使用当前作用域的 TACGEN（注入到 parser.py 时，parser 将有自己的 TACGEN）
-    # 直接调用 save，save 会创建目录并写入文件
     TACGEN.save(TAC_OUTPUT_FILE)
     return node
 
-def function(children):
-    node = Node("function", children)
-    if children:
-        # children 的结构取决于 parser，尽量使用 str() 兼容 token / node
-        func_name = str(children[1]) if len(children) > 1 else "anonymous"
-        TACGEN.emit("FUNC_BEGIN", func_name)
-    return node
 
-def var_decl_code(children):
+def var_decl(children):
     node = Node("var_decl", children)
-    if children:
-        var_name = str(children[1]) if len(children) > 1 else str(children[0])
-        TACGEN.emit("VAR_DECL", var_name)
+    for c in children:
+        TACGEN.emit("VAR", str(c))
     return node
 
-def assign_code(children):
+
+def assign(children):
     node = Node("assign", children)
-    # 典型 children: [IDENTIFIER, expr_node_or_token]
-    if len(children) >= 2:
-        left = str(children[0])
-        right = str(children[1])
-        # 目前保持与现有 emit 调用兼容：emit(op, arg1, arg2, result)
-        # 如果你后续希望用 "result = arg1 op arg2"，可以把 result 传入
-        TACGEN.emit("ASSIGN", left, right)
+    left = str(children[0])
+    right = str(children[-1])
+    TACGEN.emit("ASSIGN", right, None, left)
     return node
 
-def if_code(children):
-    node = Node("if", children)
-    TACGEN.emit("IF", str(children))
-    return node
-
-def while_code(children):
-    node = Node("while", children)
-    TACGEN.emit("WHILE", str(children))
-    return node
-
-def return_code(children):
-    node = Node("return", children)
-    if children:
-        TACGEN.emit("RETURN", str(children[0]))
-    return node
-
-def expr_code(children):
-    node = Node("expr", children)
-    TACGEN.emit("EXPR", str(children))
-    return node
-
-def block_code(children):
-    node = Node("block", children)
-    TACGEN.emit("BLOCK", str(children))
-    return node
 
 def add(children):
     node = Node("add", children)
-    if len(children) == 2:
-        TACGEN.emit("ADD", str(children[0]), str(children[1]))
-    return node
+    t = TACGEN.new_temp()
+    TACGEN.emit("ADD", str(children[0]), str(children[2]), t)
+    return t
+
 
 def sub(children):
     node = Node("sub", children)
-    if len(children) == 2:
-        TACGEN.emit("SUB", str(children[0]), str(children[1]))
-    return node
+    t = TACGEN.new_temp()
+    TACGEN.emit("SUB", str(children[0]), str(children[2]), t)
+    return t
+
 
 def mul(children):
     node = Node("mul", children)
-    if len(children) == 2:
-        TACGEN.emit("MUL", str(children[0]), str(children[1]))
-    return node
+    t = TACGEN.new_temp()
+    TACGEN.emit("MUL", str(children[0]), str(children[2]), t)
+    return t
+
 
 def div(children):
     node = Node("div", children)
-    if len(children) == 2:
-        TACGEN.emit("DIV", str(children[0]), str(children[1]))
-    return node
+    t = TACGEN.new_temp()
+    TACGEN.emit("DIV", str(children[0]), str(children[2]), t)
+    return t
+
+
+def pass_through(children):
+    """默认动作：直接返回唯一子节点"""
+    return children[0] if children else None
+
+
+# ===================== ACTION TABLE（产生式字符串 → 函数） =====================
 
 ACTIONS = {
-    "program": program,
-    "function": function,
-    "var_decl_code": var_decl_code,
-    "assign_code": assign_code,
-    "if_code": if_code,
-    "while_code": while_code,
-    "return_code": return_code,
-    "expr_code": expr_code,
-    "block_code": block_code,
-    "add": add,
-    "sub": sub,
-    "mul": mul,
-    "div": div,
+    "<program> -> <decl_part> <compound_stmt> DOT": program,
+
+    "<var_decl_part> -> VAR <ident_list> SEMI": var_decl,
+
+    "<assign_stmt> -> IDENTIFIER ASSIGN <expr>": assign,
+
+    "<expr_tail> -> PLUS <term> <expr_tail>": add,
+    "<expr_tail> -> MINUS <term> <expr_tail>": sub,
+
+    "<term_tail> -> MULT <factor> <term_tail>": mul,
+    "<term_tail> -> DIV <factor> <term_tail>": div,
+
+    # 兜底规则（无语义，仅传递）
+    "<expr> -> <term> <expr_tail>": pass_through,
+    "<term> -> <factor> <term_tail>": pass_through,
+    "<factor> -> IDENTIFIER": pass_through,
+    "<factor> -> NUMBER": pass_through,
+    "<factor> -> LPAREN <expr> RPAREN": pass_through,
 }
 
-# ----------------- ActionBuilder -----------------
+
+# ===================== ActionBuilder =====================
+
 class ActionBuilder:
-    def __init__(self, parser_file):
+    def __init__(self, parser_file: str):
         self.parser_file = parser_file
 
-    def build(self):
+    def build(self) -> str:
         if not os.path.exists(self.parser_file):
-            raise FileNotFoundError(f"{self.parser_file} 不存在")
+            raise FileNotFoundError(self.parser_file)
 
         with open(self.parser_file, "r", encoding="utf-8") as f:
             parser_code = f.read()
 
-        injected_code = parser_code + "\n\n# ===== 注入动作与 TAC =====\n"
-        injected_code += "from src.runtime.ctx import TACContext\n"
-        injected_code += "from src.runtime.token import Node\n"
-        # 在注入的 parser 中创建 TACGEN（parser 运行时使用此实例）
-        injected_code += "TACGEN = TACContext()\n\n"
+        injected = []
+        injected.append(parser_code)
+        injected.append("\n\n# ====== Semantic Actions & TAC ======\n")
+        injected.append("from src.runtime.ctx import TACContext\n")
+        injected.append("from src.runtime.token import Node\n\n")
+        injected.append("TACGEN = TACContext()\n\n")
 
-        funcs_written = set()
+        written = set()
         for func in ACTIONS.values():
-            if func not in funcs_written:
-                injected_code += inspect.getsource(func) + "\n\n"
-                funcs_written.add(func)
+            if func not in written:
+                injected.append(inspect.getsource(func))
+                injected.append("\n\n")
+                written.add(func)
 
-        injected_code += "ACTIONS = {\n"
-        for key, func in ACTIONS.items():
-            injected_code += f"    '{key}': {func.__name__},\n"
-        injected_code += "}\n\n"
+        injected.append("ACTIONS = {\n")
+        for k, v in ACTIONS.items():
+            injected.append(f"    {k!r}: {v.__name__},\n")
+        injected.append("}\n\n")
 
-        # 替换 parse() 中占位调用为真实动作调用（注：这是一个简单的驱动版）
-        injected_code += '''
-def parse_with_actions(token_list, verbose=True):
-    from generated_compiler import temp_parser as tp
-    # 使用原 parse() 构建的栈结构（简单驱动）
-    stack = ['$']
-    stack.append(tp.start_symbol)
-    stack_nodes = []
-    ip = 0
-    while stack:
-        top = stack.pop()
-        lookahead = token_list[ip]
-        if top == '$' or top not in tp.nonterminals:
-            if top == lookahead:
-                stack_nodes.append(lookahead)
-                ip += 1
-                if top == '$':
-                    return True
-                continue
-            else:
-                return False
-        else:
-            key = (top, lookahead)
-            entry = tp.parse_table.get(key)
-            if entry is None:
-                return False
-            left, right, action = entry
-            for sym in reversed(right):
-                stack.append(sym)
-            if action:
-                # pop children (终结符/非终结符都有对应的 stack_nodes 项)
-                children = [stack_nodes.pop() for _ in right][::-1]
-                node = ACTIONS[action](children)
-                stack_nodes.append(node)
-    return True
-'''
+        injected.append("# 对外导出 TAC\n")
+        injected.append("EXPORT_TAC = TACGEN\n")
 
-        injected_code += f"\nEXPORT_TAC = TACGEN\n"
-        return injected_code
+        return "".join(injected)
