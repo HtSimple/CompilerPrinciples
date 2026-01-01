@@ -168,6 +168,7 @@ class YaccBuilder:
             "# -*- coding: utf-8 -*-",
             "",
             "from collections import deque",
+            "from generator.action_builder import TAC_OUTPUT_FILE",
             "",
             "ACTIONS = {}",
             "",
