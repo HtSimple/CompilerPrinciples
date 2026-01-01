@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-ActionBuilder（while / if / relop 最终修复版）
+ActionBuilder（while / if / relop）
 """
 
 import os

@@ -1,0 +1,6 @@
+var x;
+begin
+    x := 5;
+    if odd x then
+        x := x + 1
+end.

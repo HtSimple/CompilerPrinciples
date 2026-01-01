@@ -1,0 +1,6 @@
+const m = 10;
+var a, b;
+
+begin
+    a = 100;  
+end.

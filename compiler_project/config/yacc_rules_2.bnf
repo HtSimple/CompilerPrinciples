@@ -1,0 +1,83 @@
+# ===================== PL/0 语法规则（展开修正版） =====================
+# 注意：每一行都必须包含 ::=，严禁直接换行使用 |
+
+<program> ::= <block> DOT
+
+# 核心 Block
+<block> ::= <const_decl> <var_decl> <proc_decl> <compound_stmt>
+
+# ---------- 1. 常量声明 ----------
+<const_decl> ::= CONST <const_def_list> SEMI
+<const_decl> ::= ε
+
+<const_def_list> ::= IDENTIFIER EQ NUMBER <const_def_tail>
+
+<const_def_tail> ::= COMMA IDENTIFIER EQ NUMBER <const_def_tail>
+<const_def_tail> ::= ε
+
+# ---------- 2. 变量声明 ----------
+<var_decl> ::= VAR <ident_list> SEMI
+<var_decl> ::= ε
+
+<ident_list> ::= IDENTIFIER <ident_tail>
+
+<ident_tail> ::= COMMA IDENTIFIER <ident_tail>
+<ident_tail> ::= ε
+
+# ---------- 3. 过程声明 ----------
+<proc_decl> ::= <proc> <proc_decl>
+<proc_decl> ::= ε
+
+<proc> ::= PROCEDURE IDENTIFIER SEMI <block> SEMI
+
+# ---------- 4. 语句部分 ----------
+<compound_stmt> ::= BEGIN <stmt_list> END
+
+<stmt_list> ::= <stmt> <stmt_tail>
+
+<stmt_tail> ::= SEMI <stmt> <stmt_tail>
+<stmt_tail> ::= ε
+
+# 语句分支 (必须拆开写)
+<stmt> ::= <assign_stmt>
+<stmt> ::= <if_stmt>
+<stmt> ::= <while_stmt>
+<stmt> ::= <call_stmt>
+<stmt> ::= <compound_stmt>
+<stmt> ::= ε
+
+# 具体语句
+<assign_stmt> ::= IDENTIFIER ASSIGN <expr>
+
+<call_stmt> ::= CALL IDENTIFIER
+
+<if_stmt> ::= IF <condition> THEN <stmt>
+
+<while_stmt> ::= WHILE <condition> DO <stmt>
+
+# ---------- 5. 表达式 ----------
+<condition> ::= ODD <expr>
+<condition> ::= <expr> <relop> <expr>
+
+<relop> ::= EQ
+<relop> ::= NE
+<relop> ::= LT
+<relop> ::= GT
+<relop> ::= LE
+<relop> ::= GE
+
+<expr> ::= <term> <expr_tail>
+
+<expr_tail> ::= PLUS <term> <expr_tail>
+<expr_tail> ::= MINUS <term> <expr_tail>
+<expr_tail> ::= ε
+
+<term> ::= <factor> <term_tail>
+
+<term_tail> ::= MULT <factor> <term_tail>
+<term_tail> ::= DIV <factor> <term_tail>
+<term_tail> ::= ε
+
+<factor> ::= IDENTIFIER
+<factor> ::= NUMBER
+<factor> ::= LPAREN <expr> RPAREN

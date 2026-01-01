@@ -1,0 +1,9 @@
+SET @min_salary := 5000;
+SET @active_status := 1;
+
+INSERT INTO employees VALUES ( 101, 'Alice', 'Engineering' );
+INSERT INTO employees VALUES ( 102, 'Bob', 'Marketing' );
+
+SELECT id, name, department 
+FROM employees 
+WHERE salary >= @min_salary AND status = @active_status;

@@ -1,315 +1,214 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+nonterminals = ['<expression_stmt>', '<decl_list>', '<local_decls>', '<param_tail>', '<id_tail>', '<decl_suffix>', '<expr_tail>', '<stmt>', '<arg_tail>', '<term_tail>', '<declaration>', '<program>', '<params>', '<expression>', '<compound_stmt>', '<mulop>', '<args>', '<param_list>', '<relop_expr>', '<term>', '<var_decl>', '<factor>', '<return_val>', '<arg_list>', '<selection_stmt>', '<iteration_stmt>', '<type_spec>', '<add_expr_tail>', '<stmt_list>', '<return_stmt>', '<additive_expression>', '<else_part>', '<relop>', '<addop>']
+terminals = ['LE', 'NEQ', 'EQ', 'PLUS', 'FLOAT', 'DIV', 'STAR', 'LPAREN', 'IF', 'LBRACE', 'FLOAT_LITERAL', 'WHILE', 'GE', 'ELSE', 'ASSIGN', 'GT', 'IDENTIFIER', 'RBRACE', 'INT_LITERAL', 'RETURN', 'SEMI', 'MINUS', 'VOID', 'RPAREN', 'LT', 'COMMA', 'INT']
+start_symbol = '<program>'
+parse_table = {
+    ('<add_expr_tail>', 'ASSIGN'): ([], ''),
+    ('<add_expr_tail>', 'COMMA'): ([], ''),
+    ('<add_expr_tail>', 'EQ'): ([], ''),
+    ('<add_expr_tail>', 'GE'): ([], ''),
+    ('<add_expr_tail>', 'GT'): ([], ''),
+    ('<add_expr_tail>', 'LE'): ([], ''),
+    ('<add_expr_tail>', 'LT'): ([], ''),
+    ('<add_expr_tail>', 'MINUS'): (['<addop>', '<term>', '<add_expr_tail>'], ''),
+    ('<add_expr_tail>', 'NEQ'): ([], ''),
+    ('<add_expr_tail>', 'PLUS'): (['<addop>', '<term>', '<add_expr_tail>'], ''),
+    ('<add_expr_tail>', 'RPAREN'): ([], ''),
+    ('<add_expr_tail>', 'SEMI'): ([], ''),
+    ('<additive_expression>', 'FLOAT_LITERAL'): (['<term>', '<add_expr_tail>'], ''),
+    ('<additive_expression>', 'IDENTIFIER'): (['<term>', '<add_expr_tail>'], ''),
+    ('<additive_expression>', 'INT_LITERAL'): (['<term>', '<add_expr_tail>'], ''),
+    ('<additive_expression>', 'LPAREN'): (['<term>', '<add_expr_tail>'], ''),
+    ('<addop>', 'MINUS'): (['MINUS'], ''),
+    ('<addop>', 'PLUS'): (['PLUS'], ''),
+    ('<arg_list>', 'FLOAT_LITERAL'): (['<expression>', '<arg_tail>'], ''),
+    ('<arg_list>', 'IDENTIFIER'): (['<expression>', '<arg_tail>'], ''),
+    ('<arg_list>', 'INT_LITERAL'): (['<expression>', '<arg_tail>'], ''),
+    ('<arg_list>', 'LPAREN'): (['<expression>', '<arg_tail>'], ''),
+    ('<arg_tail>', 'COMMA'): (['COMMA', '<expression>', '<arg_tail>'], ''),
+    ('<arg_tail>', 'RPAREN'): ([], ''),
+    ('<args>', 'FLOAT_LITERAL'): (['<arg_list>'], ''),
+    ('<args>', 'IDENTIFIER'): (['<arg_list>'], ''),
+    ('<args>', 'INT_LITERAL'): (['<arg_list>'], ''),
+    ('<args>', 'LPAREN'): (['<arg_list>'], ''),
+    ('<args>', 'RPAREN'): ([], ''),
+    ('<compound_stmt>', 'LBRACE'): (['LBRACE', '<local_decls>', '<stmt_list>', 'RBRACE'], ''),
+    ('<decl_list>', '$'): ([], ''),
+    ('<decl_list>', 'FLOAT'): (['<declaration>', '<decl_list>'], ''),
+    ('<decl_list>', 'INT'): (['<declaration>', '<decl_list>'], ''),
+    ('<decl_list>', 'VOID'): (['<declaration>', '<decl_list>'], ''),
+    ('<decl_suffix>', 'LPAREN'): (['LPAREN', '<params>', 'RPAREN', '<compound_stmt>'], ''),
+    ('<decl_suffix>', 'SEMI'): (['SEMI'], ''),
+    ('<declaration>', 'FLOAT'): (['<type_spec>', 'IDENTIFIER', '<decl_suffix>'], ''),
+    ('<declaration>', 'INT'): (['<type_spec>', 'IDENTIFIER', '<decl_suffix>'], ''),
+    ('<declaration>', 'VOID'): (['<type_spec>', 'IDENTIFIER', '<decl_suffix>'], ''),
+    ('<else_part>', 'ELSE'): (['ELSE', '<stmt>'], ''),
+    ('<else_part>', 'FLOAT_LITERAL'): ([], ''),
+    ('<else_part>', 'IDENTIFIER'): ([], ''),
+    ('<else_part>', 'IF'): ([], ''),
+    ('<else_part>', 'INT_LITERAL'): ([], ''),
+    ('<else_part>', 'LBRACE'): ([], ''),
+    ('<else_part>', 'LPAREN'): ([], ''),
+    ('<else_part>', 'RBRACE'): ([], ''),
+    ('<else_part>', 'RETURN'): ([], ''),
+    ('<else_part>', 'SEMI'): ([], ''),
+    ('<else_part>', 'WHILE'): ([], ''),
+    ('<expr_tail>', 'ASSIGN'): (['ASSIGN', '<expression>'], ''),
+    ('<expr_tail>', 'COMMA'): (['<relop_expr>'], ''),
+    ('<expr_tail>', 'EQ'): (['<relop_expr>'], ''),
+    ('<expr_tail>', 'GE'): (['<relop_expr>'], ''),
+    ('<expr_tail>', 'GT'): (['<relop_expr>'], ''),
+    ('<expr_tail>', 'LE'): (['<relop_expr>'], ''),
+    ('<expr_tail>', 'LT'): (['<relop_expr>'], ''),
+    ('<expr_tail>', 'NEQ'): (['<relop_expr>'], ''),
+    ('<expr_tail>', 'RPAREN'): (['<relop_expr>'], ''),
+    ('<expr_tail>', 'SEMI'): (['<relop_expr>'], ''),
+    ('<expression>', 'FLOAT_LITERAL'): (['<additive_expression>', '<expr_tail>'], ''),
+    ('<expression>', 'IDENTIFIER'): (['<additive_expression>', '<expr_tail>'], ''),
+    ('<expression>', 'INT_LITERAL'): (['<additive_expression>', '<expr_tail>'], ''),
+    ('<expression>', 'LPAREN'): (['<additive_expression>', '<expr_tail>'], ''),
+    ('<expression_stmt>', 'FLOAT_LITERAL'): (['<expression>', 'SEMI'], ''),
+    ('<expression_stmt>', 'IDENTIFIER'): (['<expression>', 'SEMI'], ''),
+    ('<expression_stmt>', 'INT_LITERAL'): (['<expression>', 'SEMI'], ''),
+    ('<expression_stmt>', 'LPAREN'): (['<expression>', 'SEMI'], ''),
+    ('<expression_stmt>', 'SEMI'): (['SEMI'], ''),
+    ('<factor>', 'FLOAT_LITERAL'): (['FLOAT_LITERAL'], ''),
+    ('<factor>', 'IDENTIFIER'): (['IDENTIFIER', '<id_tail>'], ''),
+    ('<factor>', 'INT_LITERAL'): (['INT_LITERAL'], ''),
+    ('<factor>', 'LPAREN'): (['LPAREN', '<expression>', 'RPAREN'], ''),
+    ('<id_tail>', 'ASSIGN'): ([], ''),
+    ('<id_tail>', 'COMMA'): ([], ''),
+    ('<id_tail>', 'DIV'): ([], ''),
+    ('<id_tail>', 'EQ'): ([], ''),
+    ('<id_tail>', 'GE'): ([], ''),
+    ('<id_tail>', 'GT'): ([], ''),
+    ('<id_tail>', 'LE'): ([], ''),
+    ('<id_tail>', 'LPAREN'): (['LPAREN', '<args>', 'RPAREN'], ''),
+    ('<id_tail>', 'LT'): ([], ''),
+    ('<id_tail>', 'MINUS'): ([], ''),
+    ('<id_tail>', 'NEQ'): ([], ''),
+    ('<id_tail>', 'PLUS'): ([], ''),
+    ('<id_tail>', 'RPAREN'): ([], ''),
+    ('<id_tail>', 'SEMI'): ([], ''),
+    ('<id_tail>', 'STAR'): ([], ''),
+    ('<iteration_stmt>', 'WHILE'): (['WHILE', 'LPAREN', '<expression>', 'RPAREN', '<stmt>'], ''),
+    ('<local_decls>', 'FLOAT'): (['<var_decl>', '<local_decls>'], ''),
+    ('<local_decls>', 'FLOAT_LITERAL'): ([], ''),
+    ('<local_decls>', 'IDENTIFIER'): ([], ''),
+    ('<local_decls>', 'IF'): ([], ''),
+    ('<local_decls>', 'INT'): (['<var_decl>', '<local_decls>'], ''),
+    ('<local_decls>', 'INT_LITERAL'): ([], ''),
+    ('<local_decls>', 'LBRACE'): ([], ''),
+    ('<local_decls>', 'LPAREN'): ([], ''),
+    ('<local_decls>', 'RBRACE'): ([], ''),
+    ('<local_decls>', 'RETURN'): ([], ''),
+    ('<local_decls>', 'SEMI'): ([], ''),
+    ('<local_decls>', 'VOID'): (['<var_decl>', '<local_decls>'], ''),
+    ('<local_decls>', 'WHILE'): ([], ''),
+    ('<mulop>', 'DIV'): (['DIV'], ''),
+    ('<mulop>', 'STAR'): (['STAR'], ''),
+    ('<param_list>', 'FLOAT'): (['<type_spec>', 'IDENTIFIER', '<param_tail>'], ''),
+    ('<param_list>', 'INT'): (['<type_spec>', 'IDENTIFIER', '<param_tail>'], ''),
+    ('<param_list>', 'VOID'): (['<type_spec>', 'IDENTIFIER', '<param_tail>'], ''),
+    ('<param_tail>', 'COMMA'): (['COMMA', '<type_spec>', 'IDENTIFIER', '<param_tail>'], ''),
+    ('<param_tail>', 'RPAREN'): ([], ''),
+    ('<params>', 'FLOAT'): (['<param_list>'], ''),
+    ('<params>', 'INT'): (['<param_list>'], ''),
+    ('<params>', 'RPAREN'): ([], ''),
+    ('<params>', 'VOID'): (['<param_list>'], ''),
+    ('<program>', '$'): (['<decl_list>'], ''),
+    ('<program>', 'FLOAT'): (['<decl_list>'], ''),
+    ('<program>', 'INT'): (['<decl_list>'], ''),
+    ('<program>', 'VOID'): (['<decl_list>'], ''),
+    ('<relop>', 'EQ'): (['EQ'], ''),
+    ('<relop>', 'GE'): (['GE'], ''),
+    ('<relop>', 'GT'): (['GT'], ''),
+    ('<relop>', 'LE'): (['LE'], ''),
+    ('<relop>', 'LT'): (['LT'], ''),
+    ('<relop>', 'NEQ'): (['NEQ'], ''),
+    ('<relop_expr>', 'COMMA'): ([], ''),
+    ('<relop_expr>', 'EQ'): (['<relop>', '<additive_expression>'], ''),
+    ('<relop_expr>', 'GE'): (['<relop>', '<additive_expression>'], ''),
+    ('<relop_expr>', 'GT'): (['<relop>', '<additive_expression>'], ''),
+    ('<relop_expr>', 'LE'): (['<relop>', '<additive_expression>'], ''),
+    ('<relop_expr>', 'LT'): (['<relop>', '<additive_expression>'], ''),
+    ('<relop_expr>', 'NEQ'): (['<relop>', '<additive_expression>'], ''),
+    ('<relop_expr>', 'RPAREN'): ([], ''),
+    ('<relop_expr>', 'SEMI'): ([], ''),
+    ('<return_stmt>', 'RETURN'): (['RETURN', '<return_val>', 'SEMI'], ''),
+    ('<return_val>', 'FLOAT_LITERAL'): (['<expression>'], ''),
+    ('<return_val>', 'IDENTIFIER'): (['<expression>'], ''),
+    ('<return_val>', 'INT_LITERAL'): (['<expression>'], ''),
+    ('<return_val>', 'LPAREN'): (['<expression>'], ''),
+    ('<return_val>', 'SEMI'): ([], ''),
+    ('<selection_stmt>', 'IF'): (['IF', 'LPAREN', '<expression>', 'RPAREN', '<stmt>', '<else_part>'], ''),
+    ('<stmt>', 'FLOAT_LITERAL'): (['<expression_stmt>'], ''),
+    ('<stmt>', 'IDENTIFIER'): (['<expression_stmt>'], ''),
+    ('<stmt>', 'IF'): (['<selection_stmt>'], ''),
+    ('<stmt>', 'INT_LITERAL'): (['<expression_stmt>'], ''),
+    ('<stmt>', 'LBRACE'): (['<compound_stmt>'], ''),
+    ('<stmt>', 'LPAREN'): (['<expression_stmt>'], ''),
+    ('<stmt>', 'RETURN'): (['<return_stmt>'], ''),
+    ('<stmt>', 'SEMI'): (['<expression_stmt>'], ''),
+    ('<stmt>', 'WHILE'): (['<iteration_stmt>'], ''),
+    ('<stmt_list>', 'FLOAT_LITERAL'): (['<stmt>', '<stmt_list>'], ''),
+    ('<stmt_list>', 'IDENTIFIER'): (['<stmt>', '<stmt_list>'], ''),
+    ('<stmt_list>', 'IF'): (['<stmt>', '<stmt_list>'], ''),
+    ('<stmt_list>', 'INT_LITERAL'): (['<stmt>', '<stmt_list>'], ''),
+    ('<stmt_list>', 'LBRACE'): (['<stmt>', '<stmt_list>'], ''),
+    ('<stmt_list>', 'LPAREN'): (['<stmt>', '<stmt_list>'], ''),
+    ('<stmt_list>', 'RBRACE'): ([], ''),
+    ('<stmt_list>', 'RETURN'): (['<stmt>', '<stmt_list>'], ''),
+    ('<stmt_list>', 'SEMI'): (['<stmt>', '<stmt_list>'], ''),
+    ('<stmt_list>', 'WHILE'): (['<stmt>', '<stmt_list>'], ''),
+    ('<term>', 'FLOAT_LITERAL'): (['<factor>', '<term_tail>'], ''),
+    ('<term>', 'IDENTIFIER'): (['<factor>', '<term_tail>'], ''),
+    ('<term>', 'INT_LITERAL'): (['<factor>', '<term_tail>'], ''),
+    ('<term>', 'LPAREN'): (['<factor>', '<term_tail>'], ''),
+    ('<term_tail>', 'ASSIGN'): ([], ''),
+    ('<term_tail>', 'COMMA'): ([], ''),
+    ('<term_tail>', 'DIV'): (['<mulop>', '<factor>', '<term_tail>'], ''),
+    ('<term_tail>', 'EQ'): ([], ''),
+    ('<term_tail>', 'GE'): ([], ''),
+    ('<term_tail>', 'GT'): ([], ''),
+    ('<term_tail>', 'LE'): ([], ''),
+    ('<term_tail>', 'LT'): ([], ''),
+    ('<term_tail>', 'MINUS'): ([], ''),
+    ('<term_tail>', 'NEQ'): ([], ''),
+    ('<term_tail>', 'PLUS'): ([], ''),
+    ('<term_tail>', 'RPAREN'): ([], ''),
+    ('<term_tail>', 'SEMI'): ([], ''),
+    ('<term_tail>', 'STAR'): (['<mulop>', '<factor>', '<term_tail>'], ''),
+    ('<type_spec>', 'FLOAT'): (['FLOAT'], ''),
+    ('<type_spec>', 'INT'): (['INT'], ''),
+    ('<type_spec>', 'VOID'): (['VOID'], ''),
+    ('<var_decl>', 'FLOAT'): (['<type_spec>', 'IDENTIFIER', 'SEMI'], ''),
+    ('<var_decl>', 'INT'): (['<type_spec>', 'IDENTIFIER', 'SEMI'], ''),
+    ('<var_decl>', 'VOID'): (['<type_spec>', 'IDENTIFIER', 'SEMI'], ''),
+}
 
-from collections import deque
-from generator.action_builder import TAC_OUTPUT_FILE
-
-ACTIONS = {}
-
-def parse(tokens, verbose=False):
-    token_types = [t.type for t in tokens] + ['$']
-    value_stack = []
-
-    stack = deque(['$', '<program>'])
-    i = 0
-
+def parse(token_list, verbose=True):
+    if not token_list or token_list[-1] != '$':
+        token_list = list(token_list) + ['$']
+    stack = ['$']
+    stack.append(start_symbol)
+    ip = 0
     while stack:
         top = stack.pop()
-        lookahead = token_types[i]
-
-        if top == lookahead == '$':
-            return value_stack[-1] if value_stack else None
-
-        if isinstance(top, tuple) and top[0] == '@REDUCE@':
-            _, lhs, rhs = top
-            if rhs != ['ε']:
-                children = value_stack[-len(rhs):]
-                del value_stack[-len(rhs):]
-            else:
-                children = []
-
-            key = f"{lhs} -> {' '.join(rhs)}"
-            node = ACTIONS[key](children) if key in ACTIONS else None
-            value_stack.append(node)
-            continue
-
-        if not top.startswith('<'):
-            if top == lookahead:
-                value_stack.append(tokens[i])
-                i += 1
-                continue
-
-            tok = tokens[i]
-            line = getattr(tok, 'line', '?')
-            raise SyntaxError(
-                f"语法错误（第 {line} 行）：期望 {top}，得到 {tok.type} ({tok.value})"
-            )
-
-        key = (top, lookahead)
-        if key not in PARSE_TABLE:
-            tok = tokens[i]
-            line = getattr(tok, 'line', '?')
-            expected = sorted({t for (A, t) in PARSE_TABLE if A == top})
-            raise SyntaxError(
-                f"语法错误（第 {line} 行）：遇到 {tok.type} ({tok.value})，期望 {expected}"
-            )
-
-        prod = PARSE_TABLE[key]
-        stack.append(('@REDUCE@', top, prod))
-        for sym in reversed(prod):
-            if sym != 'ε':
-                stack.append(sym)
-
-    return None
-
-PARSE_TABLE = {
-    ('<assign_stmt>', 'IDENTIFIER'): ['IDENTIFIER', 'ASSIGN', '<expr>'],
-    ('<call_stmt>', 'CALL'): ['CALL', 'IDENTIFIER'],
-    ('<compound_stmt>', 'BEGIN'): ['BEGIN', '<stmt_list>', 'END'],
-    ('<condition>', 'IDENTIFIER'): ['<expr>', '<relop>', '<expr>'],
-    ('<condition>', 'LPAREN'): ['<expr>', '<relop>', '<expr>'],
-    ('<condition>', 'NUMBER'): ['<expr>', '<relop>', '<expr>'],
-    ('<condition>', 'ODD'): ['ODD', '<expr>'],
-    ('<const_decl_part>', 'CONST'): ['CONST', '<const_list>', 'SEMI'],
-    ('<const_list>', 'IDENTIFIER'): ['IDENTIFIER', 'EQ', 'NUMBER', '<const_list_tail>'],
-    ('<const_list_tail>', 'COMMA'): ['COMMA', 'IDENTIFIER', 'EQ', 'NUMBER', '<const_list_tail>'],
-    ('<const_list_tail>', 'SEMI'): ['ε'],
-    ('<decl_part>', 'BEGIN'): ['ε'],
-    ('<decl_part>', 'CONST'): ['<const_decl_part>', '<var_decl_part>', '<proc_decl_part>'],
-    ('<decl_part>', 'PROCEDURE'): ['<proc_decl_part>'],
-    ('<decl_part>', 'VAR'): ['<var_decl_part>', '<proc_decl_part>'],
-    ('<expr>', 'IDENTIFIER'): ['<term>', '<expr_tail>'],
-    ('<expr>', 'LPAREN'): ['<term>', '<expr_tail>'],
-    ('<expr>', 'NUMBER'): ['<term>', '<expr_tail>'],
-    ('<expr_tail>', 'DO'): ['ε'],
-    ('<expr_tail>', 'END'): ['ε'],
-    ('<expr_tail>', 'EQ'): ['ε'],
-    ('<expr_tail>', 'GE'): ['ε'],
-    ('<expr_tail>', 'GT'): ['ε'],
-    ('<expr_tail>', 'LE'): ['ε'],
-    ('<expr_tail>', 'LT'): ['ε'],
-    ('<expr_tail>', 'MINUS'): ['MINUS', '<term>', '<expr_tail>'],
-    ('<expr_tail>', 'NE'): ['ε'],
-    ('<expr_tail>', 'PLUS'): ['PLUS', '<term>', '<expr_tail>'],
-    ('<expr_tail>', 'RPAREN'): ['ε'],
-    ('<expr_tail>', 'SEMI'): ['ε'],
-    ('<expr_tail>', 'THEN'): ['ε'],
-    ('<factor>', 'IDENTIFIER'): ['IDENTIFIER'],
-    ('<factor>', 'LPAREN'): ['LPAREN', '<expr>', 'RPAREN'],
-    ('<factor>', 'NUMBER'): ['NUMBER'],
-    ('<ident_list>', 'IDENTIFIER'): ['IDENTIFIER', '<ident_list_rest>'],
-    ('<ident_list_rest>', 'COMMA'): ['COMMA', 'IDENTIFIER', '<ident_list_rest>'],
-    ('<ident_list_rest>', 'SEMI'): ['ε'],
-    ('<if_stmt>', 'IF'): ['IF', '<condition>', 'THEN', '<stmt>'],
-    ('<proc_decl>', 'PROCEDURE'): ['PROCEDURE', 'IDENTIFIER', 'SEMI', '<program>', 'SEMI'],
-    ('<proc_decl_part>', 'BEGIN'): ['ε'],
-    ('<proc_decl_part>', 'PROCEDURE'): ['<proc_decl>', '<proc_decl_part>'],
-    ('<program>', 'BEGIN'): ['<decl_part>', '<compound_stmt>', 'DOT'],
-    ('<program>', 'CONST'): ['<decl_part>', '<compound_stmt>', 'DOT'],
-    ('<program>', 'PROCEDURE'): ['<decl_part>', '<compound_stmt>', 'DOT'],
-    ('<program>', 'VAR'): ['<decl_part>', '<compound_stmt>', 'DOT'],
-    ('<relop>', 'EQ'): ['EQ'],
-    ('<relop>', 'GE'): ['GE'],
-    ('<relop>', 'GT'): ['GT'],
-    ('<relop>', 'LE'): ['LE'],
-    ('<relop>', 'LT'): ['LT'],
-    ('<relop>', 'NE'): ['NE'],
-    ('<stmt>', 'BEGIN'): ['<compound_stmt>'],
-    ('<stmt>', 'CALL'): ['<call_stmt>'],
-    ('<stmt>', 'END'): ['ε'],
-    ('<stmt>', 'IDENTIFIER'): ['<assign_stmt>'],
-    ('<stmt>', 'IF'): ['<if_stmt>'],
-    ('<stmt>', 'SEMI'): ['ε'],
-    ('<stmt>', 'WHILE'): ['<while_stmt>'],
-    ('<stmt_list>', 'BEGIN'): ['<stmt>', '<stmt_list_tail>'],
-    ('<stmt_list>', 'CALL'): ['<stmt>', '<stmt_list_tail>'],
-    ('<stmt_list>', 'END'): ['<stmt>', '<stmt_list_tail>'],
-    ('<stmt_list>', 'IDENTIFIER'): ['<stmt>', '<stmt_list_tail>'],
-    ('<stmt_list>', 'IF'): ['<stmt>', '<stmt_list_tail>'],
-    ('<stmt_list>', 'SEMI'): ['<stmt>', '<stmt_list_tail>'],
-    ('<stmt_list>', 'WHILE'): ['<stmt>', '<stmt_list_tail>'],
-    ('<stmt_list_tail>', 'END'): ['ε'],
-    ('<stmt_list_tail>', 'SEMI'): ['SEMI', '<stmt>', '<stmt_list_tail>'],
-    ('<term>', 'IDENTIFIER'): ['<factor>', '<term_tail>'],
-    ('<term>', 'LPAREN'): ['<factor>', '<term_tail>'],
-    ('<term>', 'NUMBER'): ['<factor>', '<term_tail>'],
-    ('<term_tail>', 'DIV'): ['DIV', '<factor>', '<term_tail>'],
-    ('<term_tail>', 'DO'): ['ε'],
-    ('<term_tail>', 'END'): ['ε'],
-    ('<term_tail>', 'EQ'): ['ε'],
-    ('<term_tail>', 'GE'): ['ε'],
-    ('<term_tail>', 'GT'): ['ε'],
-    ('<term_tail>', 'LE'): ['ε'],
-    ('<term_tail>', 'LT'): ['ε'],
-    ('<term_tail>', 'MINUS'): ['ε'],
-    ('<term_tail>', 'MULT'): ['MULT', '<factor>', '<term_tail>'],
-    ('<term_tail>', 'NE'): ['ε'],
-    ('<term_tail>', 'PLUS'): ['ε'],
-    ('<term_tail>', 'RPAREN'): ['ε'],
-    ('<term_tail>', 'SEMI'): ['ε'],
-    ('<term_tail>', 'THEN'): ['ε'],
-    ('<var_decl_part>', 'VAR'): ['VAR', '<ident_list>', 'SEMI'],
-    ('<while_stmt>', 'WHILE'): ['WHILE', '<condition>', 'DO', '<stmt>'],
-}
-
-# ====== Semantic Actions & TAC ======
-from src.runtime.ctx import TACContext
-from src.runtime.token import Node
-
-TACGEN = TACContext()
-
-def v(x):
-    if isinstance(x, Node):
-        return x.value
-    return str(x)
-
-
-def program(children):
-    node = Node("program", children)
-    TACGEN.save(TAC_OUTPUT_FILE)
-    return node
-
-
-def var_decl(children):
-    return Node("var_decl", children)
-
-
-def assign(children):
-    left = children[0].value
-    right = children[2]
-    TACGEN.emit("ASSIGN", v(right), None, left)
-    return Node("assign", children)
-
-
-def expr(children):
-    return children[1](children[0])
-
-
-def expr_tail_add(children):
-    term, tail = children[1], children[2]
-    def f(left):
-        t = TACGEN.new_temp()
-        TACGEN.emit("ADD", v(left), v(term), t)
-        return tail(t)
-    return f
-
-
-def expr_tail_sub(children):
-    term, tail = children[1], children[2]
-    def f(left):
-        t = TACGEN.new_temp()
-        TACGEN.emit("SUB", v(left), v(term), t)
-        return tail(t)
-    return f
-
-
-def expr_tail_empty(children):
-    return lambda x: x
-
-
-def term(children):
-    return children[1](children[0])
-
-
-def term_tail_mul(children):
-    factor, tail = children[1], children[2]
-    def f(left):
-        t = TACGEN.new_temp()
-        TACGEN.emit("MUL", v(left), v(factor), t)
-        return tail(t)
-    return f
-
-
-def term_tail_div(children):
-    factor, tail = children[1], children[2]
-    def f(left):
-        t = TACGEN.new_temp()
-        TACGEN.emit("DIV", v(left), v(factor), t)
-        return tail(t)
-    return f
-
-
-def term_tail_empty(children):
-    return lambda x: x
-
-
-def factor_id(children):
-    return children[0].value
-
-
-def factor_num(children):
-    return children[0].value
-
-
-def factor_expr(children):
-    return children[1]
-
-
-def relop(children):
-    # children[0] 是 Token，如 Token(LT, '<')
-    return children[0].type
-
-
-def condition_rel(children):
-    left, op, right = children
-    t = TACGEN.new_temp()
-    TACGEN.emit(op, v(left), v(right), t)
-    return t
-
-
-def condition_odd(children):
-    exprv = children[1]
-    t = TACGEN.new_temp()
-    TACGEN.emit("ODD", v(exprv), None, t)
-    return t
-
-
-def if_stmt(children):
-    cond = children[1]
-    Lend = TACGEN.new_label()
-    TACGEN.emit("IF_FALSE", v(cond), None, Lend)
-    return Node("if_stmt", children)
-
-
-def while_stmt(children):
-    cond = children[1]
-    Lbegin = TACGEN.new_label()
-    Lend = TACGEN.new_label()
-
-    TACGEN.emit("LABEL", None, None, Lbegin)
-    TACGEN.emit("IF_FALSE", v(cond), None, Lend)
-    # 循环体 stmt 的 TAC 已在归约时生成
-    TACGEN.emit("GOTO", None, None, Lbegin)
-    TACGEN.emit("LABEL", None, None, Lend)
-
-    return Node("while_stmt", children)
-
-
-ACTIONS = {
-    '<program> -> <decl_part> <compound_stmt> DOT': program,
-    '<var_decl_part> -> VAR <ident_list> SEMI': var_decl,
-    '<assign_stmt> -> IDENTIFIER ASSIGN <expr>': assign,
-    '<expr> -> <term> <expr_tail>': expr,
-    '<expr_tail> -> PLUS <term> <expr_tail>': expr_tail_add,
-    '<expr_tail> -> MINUS <term> <expr_tail>': expr_tail_sub,
-    '<expr_tail> -> ε': expr_tail_empty,
-    '<term> -> <factor> <term_tail>': term,
-    '<term_tail> -> MULT <factor> <term_tail>': term_tail_mul,
-    '<term_tail> -> DIV <factor> <term_tail>': term_tail_div,
-    '<term_tail> -> ε': term_tail_empty,
-    '<factor> -> IDENTIFIER': factor_id,
-    '<factor> -> NUMBER': factor_num,
-    '<factor> -> LPAREN <expr> RPAREN': factor_expr,
-    '<relop> -> EQ': relop,
-    '<relop> -> NE': relop,
-    '<relop> -> LT': relop,
-    '<relop> -> GT': relop,
-    '<relop> -> LE': relop,
-    '<relop> -> GE': relop,
-    '<condition> -> <expr> <relop> <expr>': condition_rel,
-    '<condition> -> ODD <expr>': condition_odd,
-    '<if_stmt> -> IF <condition> THEN <stmt>': if_stmt,
-    '<while_stmt> -> WHILE <condition> DO <stmt>': while_stmt,
-}
-
-EXPORT_TAC = TACGEN
+        lookahead = token_list[ip]
+        if verbose: print(f'STACK TOP: {top}, LOOKAHEAD: {lookahead}')
+        
+        if top == '$': return True if lookahead == '$' else False
+        
+        if top not in nonterminals:
+            if top == lookahead: ip += 1
+            else: 
+                if verbose: print(f'Error: Expected {top}, got {lookahead}')
+                return False
+        else:
+            key = (top, lookahead)
+            if key not in parse_table:
+                if verbose: print(f'No table entry for {key}')
+                return False
+            rhs, _ = parse_table[key]
+            for sym in reversed(rhs): stack.append(sym)
+    return True

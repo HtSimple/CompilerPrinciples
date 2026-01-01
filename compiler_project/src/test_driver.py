@@ -28,18 +28,18 @@ def run_test(file_path):
     with open(file_path, "r", encoding="utf-8") as f:
         code = f.read()
 
-    # 1️⃣ 词法分析
+    # 词法分析
     token_list = lexer.tokenize(code)  # 直接调用 tokenize 函数
     print("Token 列表:", token_list)
 
-    # 2️⃣ 语法分析
+    # 语法分析
     result = parser.parse(token_list)
     if result:
         print("语法分析通过 ✅")
     else:
         print("语法分析失败 ❌")
 
-    # 3️⃣ 如果 parser.py 会生成 TAC，可以直接查看 tac_output.txt
+    # 如果 parser.py 会生成 TAC，可以直接查看 tac_output.txt
     tac_file = os.path.join(PROJECT_ROOT, "generated_compiler", "tac_output.txt")
     if os.path.exists(tac_file):
         with open(tac_file, "r", encoding="utf-8") as f:

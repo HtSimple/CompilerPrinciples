@@ -1,0 +1,8 @@
+a = 2 ASSIGN
+t0 = 3 MUL 4
+t1 = 1 MUL 33
+t2 = a ADD t0
+t3 = t2 ADD 6
+t4 = t3 ADD 9
+t5 = t4 ADD t1
+b = t5 ASSIGN

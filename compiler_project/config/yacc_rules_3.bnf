@@ -1,0 +1,121 @@
+# ===================== Mini-C 语法规则 (LL(1) 终极修复版) =====================
+
+<program> ::= <decl_list>
+
+# ---------- 1. 声明列表 ----------
+<decl_list> ::= <declaration> <decl_list>
+<decl_list> ::= ε
+
+# 声明：提取左因子
+<declaration> ::= <type_spec> IDENTIFIER <decl_suffix>
+
+<type_spec> ::= INT
+<type_spec> ::= FLOAT
+<type_spec> ::= VOID
+
+# 后缀：分号(变量) 或 括号(函数)
+<decl_suffix> ::= SEMI
+<decl_suffix> ::= LPAREN <params> RPAREN <compound_stmt>
+
+# ---------- 2. 参数列表 ----------
+<params> ::= <param_list>
+<params> ::= ε
+
+<param_list> ::= <type_spec> IDENTIFIER <param_tail>
+
+<param_tail> ::= COMMA <type_spec> IDENTIFIER <param_tail>
+<param_tail> ::= ε
+
+# ---------- 3. 代码块与局部变量 ----------
+<compound_stmt> ::= LBRACE <local_decls> <stmt_list> RBRACE
+
+<local_decls> ::= <var_decl> <local_decls>
+<local_decls> ::= ε
+
+<var_decl> ::= <type_spec> IDENTIFIER SEMI
+
+<stmt_list> ::= <stmt> <stmt_list>
+<stmt_list> ::= ε
+
+# ---------- 4. 语句 ----------
+<stmt> ::= <expression_stmt>
+<stmt> ::= <compound_stmt>
+<stmt> ::= <selection_stmt>
+<stmt> ::= <iteration_stmt>
+<stmt> ::= <return_stmt>
+
+<expression_stmt> ::= <expression> SEMI
+<expression_stmt> ::= SEMI
+
+<selection_stmt> ::= IF LPAREN <expression> RPAREN <stmt> <else_part>
+
+<else_part> ::= ELSE <stmt>
+<else_part> ::= ε
+
+<iteration_stmt> ::= WHILE LPAREN <expression> RPAREN <stmt>
+
+<return_stmt> ::= RETURN <return_val> SEMI
+
+<return_val> ::= <expression>
+<return_val> ::= ε
+
+# ---------- 5. 表达式 (核心冲突修复) ----------
+# 原逻辑冲突点： <var> ASSIGN ... vs <simple_expression>
+# 现逻辑：先解析加法表达式，再看后缀决定是赋值还是比较
+
+<expression> ::= <additive_expression> <expr_tail>
+
+# 表达式尾部：可以是赋值(=)，可以是关系比较(==, <)，也可以结束(ε)
+<expr_tail> ::= ASSIGN <expression>
+<expr_tail> ::= <relop_expr>
+
+# 关系运算部分
+<relop_expr> ::= <relop> <additive_expression>
+<relop_expr> ::= ε
+
+<relop> ::= LE
+<relop> ::= LT
+<relop> ::= GT
+<relop> ::= GE
+<relop> ::= EQ
+<relop> ::= NEQ
+
+# 加法表达式
+<additive_expression> ::= <term> <add_expr_tail>
+
+<add_expr_tail> ::= <addop> <term> <add_expr_tail>
+<add_expr_tail> ::= ε
+
+<addop> ::= PLUS
+<addop> ::= MINUS
+
+# 乘法表达式
+<term> ::= <factor> <term_tail>
+
+<term_tail> ::= <mulop> <factor> <term_tail>
+<term_tail> ::= ε
+
+<mulop> ::= STAR
+<mulop> ::= DIV
+
+# ---------- 6. 因子 (Factor) ----------
+# 冲突修复：变量(IDENTIFIER) vs 函数调用(IDENTIFIER '(')
+# 解决方案：提取 IDENTIFIER 左因子
+
+<factor> ::= LPAREN <expression> RPAREN
+<factor> ::= INT_LITERAL
+<factor> ::= FLOAT_LITERAL
+<factor> ::= IDENTIFIER <id_tail>
+
+# 标识符尾部：如果是 ( 则为函数调用，否则为普通变量
+<id_tail> ::= LPAREN <args> RPAREN
+<id_tail> ::= ε
+
+# ---------- 7. 函数参数 ----------
+<args> ::= <arg_list>
+<args> ::= ε
+
+<arg_list> ::= <expression> <arg_tail>
+
+<arg_tail> ::= COMMA <expression> <arg_tail>
+<arg_tail> ::= ε

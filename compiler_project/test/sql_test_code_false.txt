@@ -1,0 +1,3 @@
+SET @id := 999;
+
+INSERT employees VALUES ( 999, 'ErrorUser', 'Unknown' );

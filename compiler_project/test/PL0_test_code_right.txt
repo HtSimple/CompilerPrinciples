@@ -1,0 +1,13 @@
+const m = 10;
+var a, b;
+
+procedure calc;
+begin
+    a := m + 5;
+    b := a * 2;
+end;
+
+begin
+    call calc;
+    if a > 10 then b := 0;
+end.

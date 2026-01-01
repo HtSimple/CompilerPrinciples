@@ -1,0 +1,78 @@
+# ===================== SQL 风格文法 (LL(1)) =====================
+
+# 程序入口：支持多条语句
+<program> ::= <stmt_list>
+
+# 语句列表
+<stmt_list> ::= <stmt> <stmt_list>
+<stmt_list> ::= ε
+
+# 单条语句：支持查询、插入、赋值
+<stmt> ::= <select_stmt> SEMI      #select_op
+<stmt> ::= <insert_stmt> SEMI      #insert_op
+<stmt> ::= <assign_stmt> SEMI      #assign_op
+
+# -------------------- 1. SELECT 语句 --------------------
+# 结构: SELECT [cols] FROM [table] [WHERE clause]
+<select_stmt> ::= SELECT <column_list> FROM IDENTIFIER <where_clause>
+
+# 列清单：支持 * 或 col1, col2
+<column_list> ::= STAR
+<column_list> ::= IDENTIFIER <col_list_tail>
+
+<col_list_tail> ::= COMMA IDENTIFIER <col_list_tail>
+<col_list_tail> ::= ε
+
+# WHERE 子句：可选
+<where_clause> ::= WHERE <logic_expr>
+<where_clause> ::= ε
+
+# -------------------- 2. INSERT 语句 --------------------
+# 结构: INSERT INTO [table] VALUES (val1, val2)
+<insert_stmt> ::= INSERT INTO IDENTIFIER VALUES LPAREN <value_list> RPAREN
+
+# 值列表
+<value_list> ::= <value> <value_list_tail>
+
+<value_list_tail> ::= COMMA <value> <value_list_tail>
+<value_list_tail> ::= ε
+
+# -------------------- 3. SET 赋值语句 --------------------
+# 结构: SET @var := value
+<assign_stmt> ::= SET VARIABLE ASSIGN <value>
+
+# -------------------- 4. 表达式与逻辑 --------------------
+# 逻辑表达式 (支持 AND/OR 优先级，OR 优先级最低)
+<logic_expr> ::= <and_expr> <or_tail>
+
+<or_tail> ::= OR <and_expr> <or_tail>
+<or_tail> ::= ε
+
+<and_expr> ::= <compare_expr> <and_tail>
+
+<and_tail> ::= AND <compare_expr> <and_tail>
+<and_tail> ::= ε
+
+# 比较表达式 (例如: age >= 18)
+<compare_expr> ::= <operand> <compare_tail>
+
+<compare_tail> ::= EQ <operand>
+<compare_tail> ::= NE <operand>
+<compare_tail> ::= GT <operand>
+<compare_tail> ::= LT <operand>
+<compare_tail> ::= GE <operand>
+<compare_tail> ::= LE <operand>
+# 如果没有比较符，这里需要处理单纯的 bool 变量吗？SQL通常必须有比较
+# 但为了 LL(1) 完整性，允许空 (比如 WHERE @isActive)
+<compare_tail> ::= ε
+
+# 操作数 (用于比较或赋值)
+<operand> ::= IDENTIFIER
+<operand> ::= <value>
+
+# 基础值类型
+<value> ::= NUMBER
+<value> ::= HEX
+<value> ::= STRING
+<value> ::= VARIABLE
+<value> ::= NULL

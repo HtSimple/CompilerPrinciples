@@ -1,255 +1,174 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
-"""
-yacc_builder.py
-
-从 BNF 文法自动构造 LL(1) 预测分析表，
-并生成 parser.py（支持语义动作注入 + 健壮错误提示）
-"""
-
-from collections import defaultdict
 import os
+import re
+from collections import defaultdict
 
 EPSILON = 'ε'
-ENDMARK = '$'
-REDUCE_MARK = '@REDUCE@'
-
 
 class YaccBuilder:
     def __init__(self, bnf_file):
+        if not os.path.exists(bnf_file):
+            raise FileNotFoundError(f"BNF 文件不存在: {bnf_file}")
         self.bnf_file = bnf_file
-
-        self.productions = defaultdict(list)
+        self.productions = []
         self.nonterminals = set()
         self.terminals = set()
-
+        self.start_symbol = None
         self.first = defaultdict(set)
         self.follow = defaultdict(set)
-        self.table = dict()
+        self.parse_table = dict()
 
-        self.start_symbol = None
-
-    # --------------------------------------------------
-    def load_grammar(self):
-        if not os.path.exists(self.bnf_file):
-            raise FileNotFoundError(self.bnf_file)
-
-        lines = []
+    def parse_bnf(self):
         with open(self.bnf_file, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                if "#" in line:
-                    line = line[:line.index("#")].strip()
-                lines.append(line)
+                if not line or line.startswith("#"): continue
+                if "#" in line: line, tag = line.split("#", 1)
+                else: tag = None
+                if "::=" not in line: continue
+                lhs, rhs = line.split("::=")
+                lhs = lhs.strip()
+                rhs_syms = rhs.strip().split() if rhs.strip() != EPSILON else []
+                self.productions.append((lhs, rhs_syms, tag.strip() if tag else None))
+                self.nonterminals.add(lhs)
+                for s in rhs_syms:
+                    if re.match(r"<.*>", s): self.nonterminals.add(s)
+                    else: self.terminals.add(s)
+        if self.productions: self.start_symbol = self.productions[0][0]
+        self.terminals -= self.nonterminals
 
-        i = 0
-        while i < len(lines):
-            line = lines[i]
-            if "::=" not in line:
-                i += 1
-                continue
-
-            lhs, rhs = line.split("::=", 1)
-            lhs = lhs.strip()
-
-            if self.start_symbol is None:
-                self.start_symbol = lhs
-
-            self.nonterminals.add(lhs)
-
-            rhs_all = rhs.strip()
-            i += 1
-            while i < len(lines) and "::=" not in lines[i]:
-                rhs_all += " " + lines[i]
-                i += 1
-
-            current = []
-            for tok in rhs_all.split():
-                if tok == "|":
-                    self.productions[lhs].append(current)
-                    current = []
-                else:
-                    if tok in ("ε", "EPSILON"):
-                        tok = EPSILON
-                    current.append(tok)
-
-            self.productions[lhs].append(current)
-
-        for A, prods in self.productions.items():
-            for prod in prods:
-                for sym in prod:
-                    if sym != EPSILON and not self.is_nonterminal(sym):
-                        self.terminals.add(sym)
-
-        self.terminals.add(ENDMARK)
-
-    def is_nonterminal(self, sym):
-        return sym.startswith("<") and sym.endswith(">")
-
-    # --------------------------------------------------
+    # FIRST 集计算 ===
     def compute_first(self):
-        for t in self.terminals:
-            self.first[t] = {t}
-
-        for nt in self.nonterminals:
-            self.first[nt] = set()
-
+        for t in self.terminals: self.first[t] = {t}
+        for nt in self.nonterminals: self.first[nt] = set()
+        
         changed = True
         while changed:
             changed = False
-            for A, prods in self.productions.items():
-                for prod in prods:
-                    before = len(self.first[A])
-                    self.first[A] |= self.first_of_string(prod)
-                    if len(self.first[A]) > before:
-                        changed = True
+            for lhs, rhs, _ in self.productions:
+                # 计算右部序列的 FIRST
+                seq_first = set()
+                all_nullable = True
+                
+                if not rhs: # 空产生式
+                    seq_first = {EPSILON}
+                else:
+                    for sym in rhs:
+                        sym_first = self.first[sym]
+                        seq_first.update(sym_first - {EPSILON})
+                        if EPSILON not in sym_first:
+                            all_nullable = False
+                            break
+                    if all_nullable:
+                        seq_first.add(EPSILON)
 
-    # --------------------------------------------------
-    def compute_follow(self):
-        self.follow[self.start_symbol].add(ENDMARK)
+                # 更新 LHS 的 FIRST
+                if not seq_first.issubset(self.first[lhs]):
+                    self.first[lhs].update(seq_first)
+                    changed = True
 
-        changed = True
-        while changed:
-            changed = False
-            for A, prods in self.productions.items():
-                for prod in prods:
-                    for i, B in enumerate(prod):
-                        if not self.is_nonterminal(B):
-                            continue
-                        beta = prod[i + 1:]
-                        first_beta = self.first_of_string(beta)
-
-                        before = len(self.follow[B])
-                        self.follow[B] |= (first_beta - {EPSILON})
-
-                        if EPSILON in first_beta or not beta:
-                            self.follow[B] |= self.follow[A]
-
-                        if len(self.follow[B]) > before:
-                            changed = True
-
-    # --------------------------------------------------
-    def first_of_string(self, symbols):
+    # 序列 FIRST 计算 ===
+    def first_of_sequence(self, symbols):
         result = set()
+        all_nullable = True
+        if not symbols: return {EPSILON}
+        
         for sym in symbols:
-            if sym == EPSILON:
-                result.add(EPSILON)
-                return result
-            result |= (self.first[sym] - {EPSILON})
+            result.update(self.first[sym] - {EPSILON})
             if EPSILON not in self.first[sym]:
-                return result
-        result.add(EPSILON)
+                all_nullable = False
+                break
+        if all_nullable:
+            result.add(EPSILON)
         return result
 
-    # --------------------------------------------------
-    def build_table(self):
-        for A, prods in self.productions.items():
-            for prod in prods:
-                first_alpha = self.first_of_string(prod)
-                for t in first_alpha - {EPSILON}:
-                    self.table[(A, t)] = prod
-                if EPSILON in first_alpha:
-                    for b in self.follow[A]:
-                        self.table[(A, b)] = prod
+    def compute_follow(self):
+        for nt in self.nonterminals: self.follow[nt] = set()
+        self.follow[self.start_symbol].add('$')
+        changed = True
+        while changed:
+            changed = False
+            for lhs, rhs, _ in self.productions:
+                trailer = self.follow[lhs].copy()
+                for sym in reversed(rhs):
+                    if sym in self.nonterminals:
+                        before = len(self.follow[sym])
+                        self.follow[sym].update(trailer)
+                        if EPSILON in self.first[sym]: trailer.update(self.first[sym] - {EPSILON})
+                        else: trailer = self.first[sym] - {EPSILON}
+                        if len(self.follow[sym]) > before: changed = True
+                    else: trailer = {sym}
 
-        for prod in self.productions[self.start_symbol]:
-            for t in self.first_of_string(prod) - {EPSILON}:
-                self.table[(self.start_symbol, t)] = prod
-
-    # --------------------------------------------------
-    # 生成 parser（仅增强错误提示，逻辑不变）
-    # --------------------------------------------------
-    def generate_parser(self, out_path):
-        lines = [
-            "#!/usr/bin/env python3",
-            "# -*- coding: utf-8 -*-",
-            "",
-            "from collections import deque",
-            "from generator.action_builder import TAC_OUTPUT_FILE",
-            "",
-            "ACTIONS = {}",
-            "",
-            "def parse(tokens, verbose=False):",
-            "    token_types = [t.type for t in tokens] + ['$']",
-            "    value_stack = []",
-            "",
-            f"    stack = deque(['$', '{self.start_symbol}'])",
-            "    i = 0",
-            "",
-            "    while stack:",
-            "        top = stack.pop()",
-            "        lookahead = token_types[i]",
-            "",
-            "        if top == lookahead == '$':",
-            "            return value_stack[-1] if value_stack else None",
-            "",
-            "        if isinstance(top, tuple) and top[0] == '@REDUCE@':",
-            "            _, lhs, rhs = top",
-            "            if rhs != ['ε']:",
-            "                children = value_stack[-len(rhs):]",
-            "                del value_stack[-len(rhs):]",
-            "            else:",
-            "                children = []",
-            "",
-            "            key = f\"{lhs} -> {' '.join(rhs)}\"",
-            "            node = ACTIONS[key](children) if key in ACTIONS else None",
-            "            value_stack.append(node)",
-            "            continue",
-            "",
-            "        if not top.startswith('<'):",
-            "            if top == lookahead:",
-            "                value_stack.append(tokens[i])",
-            "                i += 1",
-            "                continue",
-            "",
-            "            tok = tokens[i]",
-            "            line = getattr(tok, 'line', '?')",
-            "            raise SyntaxError(",
-            "                f\"语法错误（第 {line} 行）：期望 {top}，得到 {tok.type} ({tok.value})\"",
-            "            )",
-            "",
-            "        key = (top, lookahead)",
-            "        if key not in PARSE_TABLE:",
-            "            tok = tokens[i]",
-            "            line = getattr(tok, 'line', '?')",
-            "            expected = sorted({t for (A, t) in PARSE_TABLE if A == top})",
-            "            raise SyntaxError(",
-            "                f\"语法错误（第 {line} 行）：遇到 {tok.type} ({tok.value})，期望 {expected}\"",
-            "            )",
-            "",
-            "        prod = PARSE_TABLE[key]",
-            "        stack.append(('@REDUCE@', top, prod))",
-            "        for sym in reversed(prod):",
-            "            if sym != 'ε':",
-            "                stack.append(sym)",
-            "",
-            "    return None",
-            "",
-            "PARSE_TABLE = {"
-        ]
-
-        for (A, t), prod in sorted(self.table.items()):
-            lines.append(f"    ({A!r}, {t!r}): {prod!r},")
-
-        lines.append("}")
-
-        with open(out_path, "w", encoding="utf-8") as f:
-            f.write("\n".join(lines))
-
-        print(f"✓ parser 已生成 -> {out_path}")
-
-    # --------------------------------------------------
-    def run(self, out_path):
-        self.load_grammar()
+    def build_parse_table(self):
         self.compute_first()
         self.compute_follow()
-        self.build_table()
-        self.generate_parser(out_path)
+        for lhs, rhs, tag in self.productions:
+            first_rhs = self.first_of_sequence(rhs)
+            for t in first_rhs - {EPSILON}:
+                self.add_entry(lhs, t, rhs, tag)
+            if EPSILON in first_rhs:
+                for t in self.follow[lhs]:
+                    self.add_entry(lhs, t, rhs, tag)
 
+    def add_entry(self, lhs, term, rhs, tag):
+        key = (lhs, term)
+        if key in self.parse_table:
+            # 优先保留非空产生式
+            old_rhs = self.parse_table[key][0]
+            if not old_rhs and rhs: self.parse_table[key] = (rhs, tag)
+        else:
+            self.parse_table[key] = (rhs, tag)
+
+    def run(self, out_path):
+        self.parse_bnf()
+        self.build_parse_table()
+        
+        code = [
+            "nonterminals = " + str(list(self.nonterminals)),
+            "terminals = " + str(list(self.terminals)),
+            "start_symbol = " + repr(self.start_symbol),
+            "parse_table = {"
+        ]
+        for k, v in sorted(self.parse_table.items()):
+            tag = v[1] if v[1] else ""
+            code.append(f"    {k}: ({v[0]!r}, '{tag}'),")
+        code.append("}")
+        
+        # 写入标准的 parse 函数
+        code.append("""
+def parse(token_list, verbose=True):
+    if not token_list or token_list[-1] != '$':
+        token_list = list(token_list) + ['$']
+    stack = ['$']
+    stack.append(start_symbol)
+    ip = 0
+    while stack:
+        top = stack.pop()
+        lookahead = token_list[ip]
+        if verbose: print(f'STACK TOP: {top}, LOOKAHEAD: {lookahead}')
+        
+        if top == '$': return True if lookahead == '$' else False
+        
+        if top not in nonterminals:
+            if top == lookahead: ip += 1
+            else: 
+                if verbose: print(f'Error: Expected {top}, got {lookahead}')
+                return False
+        else:
+            key = (top, lookahead)
+            if key not in parse_table:
+                if verbose: print(f'No table entry for {key}')
+                return False
+            rhs, _ = parse_table[key]
+            for sym in reversed(rhs): stack.append(sym)
+    return True
+""")
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        with open(out_path, "w", encoding="utf-8") as f: f.write("\n".join(code))
+        print(f"✔ Parser 已更新: {out_path}")
 
 if __name__ == "__main__":
     import sys
-    YaccBuilder(sys.argv[1]).run(sys.argv[2])
+    if len(sys.argv) < 3: print("Usage: python yacc_builder.py <bnf> <out>")
+    else: YaccBuilder(sys.argv[1]).run(sys.argv[2])

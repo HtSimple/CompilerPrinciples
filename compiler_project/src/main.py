@@ -3,7 +3,7 @@ import sys
 import os
 
 # ==========================================================
-# 1. 设置工程根目录，使所有模块可被正确 import
+# 设置工程根目录，使所有模块可被正确 import
 # ==========================================================
 # 当前文件位置：compiler_project/src/main.py
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -13,13 +13,13 @@ PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
 sys.path.insert(0, PROJECT_ROOT)
 
 # ==========================================================
-# 2. 导入生成器主入口（generator_main.py）
+# 导入生成器主入口（generator_main.py）
 # ==========================================================
 from generator.generator_main import main as generate_compiler
 
 
 # ==========================================================
-# 3. 运行生成的编译器（lexer.py + parser.py）
+# 运行生成的编译器（lexer.py + parser.py）
 # ==========================================================
 def run_test_program(test_file):
     """
@@ -58,7 +58,7 @@ def run_test_program(test_file):
 
 
 # ==========================================================
-# 4. main 主流程：生成编译器 + 测试源程序
+# main
 # ==========================================================
 def main():
     print("==================================================")
